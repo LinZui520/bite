@@ -1,0 +1,7 @@
+{
+  "bite.tooltip.freshness": "新鲜度：%1$s%%（%2$s）",
+  "bite.tooltip.spoiled": "已变质",
+  "bite.msg.spoiled_inedible": "这食物已经变质了，不能吃。",
+  "bite.time.days": "约 %1$s 天",
+  "bite.time.hours": "约 %1$s 小时"
+}
