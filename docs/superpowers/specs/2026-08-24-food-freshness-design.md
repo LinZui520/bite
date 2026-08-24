@@ -345,7 +345,7 @@ config/bite/
 ├── build.gradle                      # net.fabricmc.fabric-loom 1.17 + splitEnvironmentSourceSets
 ├── gradle.properties                 # minecraft_version=26.2, loader_version=0.19.3,
 │                                     # fabric_api_version=0.158.0+26.2（无 yarn_mappings 行）
-├── src/main/java/com/heyangming/bite/
+├── src/main/java/io/github/linzui520/bite/
 │   ├── BiteMod.java                  # ModInitializer：组件注册、事件接线、配置加载
 │   ├── component/FreshnessStamp.java # record + Codec + StreamCodec + TooltipProvider
 │   ├── component/ShelfLife.java      # record + Codec
@@ -358,7 +358,7 @@ config/bite/
 │   ├── freshness/SpoiledFoodHandler.java # 进食惩罚逻辑（被 mixin 调用）
 │   ├── config/ServerConfig.java
 │   └── mixin/                        # 全部 mixin（ Consumable、合并 5 处、accessor…）
-├── src/client/java/com/heyangming/bite/client/
+├── src/client/java/io/github/linzui520/bite/client/
 │   ├── BiteModClient.java            # ClientModInitializer：tooltip/进度条注册
 │   └── render/FreshnessBar.java      # 进度条渲染
 ├── src/gametest/java/...             # fabricApi { configureTests } 生成的 gametest 源集
@@ -370,7 +370,7 @@ config/bite/
 └── docs/superpowers/specs/           # 本文档
 ```
 
-包名 `com.heyangming.bite`（脚手架前可整体替换为 GitHub 风格 `io.github.<user>.bite`，一次性 sed）。
+包名 `io.github.linzui520.bite`（已确认，对应 GitHub 用户 LinZui520）。
 
 ---
 
@@ -393,7 +393,7 @@ config/bite/
 
 ## 13. 发布（v1.0.0）
 
-- **仓库**：GitHub 公开仓库 `~/Code/bite`（remote 建议名 `because-its-too-easy` 或 `bite`）
+- **仓库**：GitHub 公开仓库 `LinZui520/bite`（本地 `~/Code/bite`）
 - **协议**：MIT（SPDX：`MIT`）
 - **fabric.mod.json**：`version 1.0.0`、`environment "*"`、`depends { fabricloader ">=0.19.3", minecraft "~26.2", java ">=25", "fabric-api": "*" }`、`contact`（homepage/sources/issues）、icon 128×128
 - **构建发布**：Gradle 插件 Minotaur（`com.modrinth.minotaur` 2.+，`uploadFile` 指向 jar）+ CurseForgeGradle（`net.darkhax.curseforgegradle` 1.3.33）；本地 `publishMods` 式单 task 手动触发（CI 自动化留待需要时）
