@@ -27,7 +27,7 @@ public record ServerConfig(
 ) {
     public static final ServerConfig DEFAULT = createDefault();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-    private static ServerConfig instance = DEFAULT;
+    private static volatile ServerConfig instance = DEFAULT;
 
     public static ServerConfig get() { return instance; }
 
@@ -53,13 +53,13 @@ public record ServerConfig(
         Raw raw = GSON.fromJson(json, Raw.class);
         if (raw == null) return DEFAULT;
         ServerConfig d = DEFAULT;
-        Map<String, Integer> shelf = raw.shelf_life_days == null ? d.shelfLifeDays : raw.shelf_life_days;
+        Map<String, Integer> shelf = raw.shelf_life_days == null ? new LinkedHashMap<>(d.shelfLifeDays) : raw.shelf_life_days;
         if (!shelf.containsKey("default")) shelf.put("default", 7);
         return new ServerConfig(
             orDefault(raw.enabled, d.enabled),
             orDefault(raw.scan_interval_ticks, d.scanIntervalTicks),
             shelf,
-            raw.item_overrides == null ? d.itemOverrides : raw.item_overrides,
+            raw.item_overrides == null ? new TreeMap<>(d.itemOverrides) : raw.item_overrides,
             orDefault(raw.stale_threshold, d.staleThreshold),
             orDefault(raw.old_threshold, d.oldThreshold),
             orDefault(raw.nutrition_scale_stale, d.nutritionScaleStale),

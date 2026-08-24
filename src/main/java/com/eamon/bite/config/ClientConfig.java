@@ -11,7 +11,7 @@ import java.nio.file.Path;
 public record ClientConfig(boolean showBar, boolean showTooltip, String tooltipStyle) {
     public static final ClientConfig DEFAULT = new ClientConfig(true, true, "percent_and_time");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-    private static ClientConfig instance = DEFAULT;
+    private static volatile ClientConfig instance = DEFAULT;
 
     public static ClientConfig get() { return instance; }
 
