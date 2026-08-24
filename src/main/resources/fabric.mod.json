@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "bite",
+  "version": "${version}",
+  "name": "Because It's Too Easy",
+  "description": "Survival is too easy. Food spoils, and so will your plans.",
+  "authors": ["Eamon"],
+  "contact": { "homepage": "https://github.com/LinZui520/bite", "sources": "https://github.com/LinZui520/bite", "issues": "https://github.com/LinZui520/bite/issues" },
+  "license": "MIT",
+  "icon": "assets/bite/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.eamon.bite.BiteMod"],
+    "client": ["com.eamon.bite.client.BiteModClient"]
+  },
+  "mixins": [
+    "bite.mixins.json",
+    { "config": "bite.client.mixins.json", "environment": "client" }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
