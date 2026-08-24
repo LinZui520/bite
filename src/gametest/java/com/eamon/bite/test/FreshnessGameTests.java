@@ -2,7 +2,10 @@ package com.eamon.bite.test;
 
 import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.FreshnessStamp;
+import com.eamon.bite.component.ShelfLife;
 import com.eamon.bite.config.ServerConfig;
+import com.eamon.bite.freshness.FreshnessClock;
+import com.eamon.bite.freshness.FreshnessMath;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -10,6 +13,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -114,5 +118,115 @@ public class FreshnessGameTests {
                 }
             })
             .thenSucceed();
+    }
+
+    /**
+     * 等价性放宽 mixin（Task 9）：两个不同 FRESHNESS 戳的同种未腐坏食物，
+     * 经 {@code ItemStack.isSameItemSameComponents} 放宽后应能通过
+     * {@link SimpleContainer#addItem} 合并到同一槽位。
+     *
+     * <p>链路：{@code addItem → moveItemToOccupiedSlotsWithSameType →
+     * ItemStack.isSameItemSameComponents(a, b)}（已 {@code javap} 确认 26.2 字节码）。
+     * mixin 在 RETURN 处把 false 改写为 true，使合并通过。
+     */
+    @GameTest(maxTicks = 20)
+    public void relaxedEqualityMergesDifferentStamps(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long shelfLifeTicks = 6L * 24000L; // bread 默认 6 天
+        long staleAge = (long) (0.8 * shelfLifeTicks); // 80% 已过 → fraction 0.2
+
+        ItemStack fresh = new ItemStack(Items.BREAD);
+        fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
+        fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+
+        ItemStack stale = new ItemStack(Items.BREAD);
+        stale.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
+        stale.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - staleAge));
+
+        SimpleContainer container = new SimpleContainer(2);
+        container.addItem(fresh.copy());
+        container.addItem(stale.copy());
+
+        int count0 = container.getItem(0).getCount();
+        int count1 = container.getItem(1).getCount();
+        if (count0 != 2 || count1 != 0) {
+            helper.fail("expected fresh+stale to merge (slot0=2, slot1=0), got slot0=" + count0 + " slot1=" + count1);
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 反例 1：不同 item（面包 vs 牛肉）不应合并——canMergeRelaxed 第一步
+     * {@code a.is(b.getItem())} 即为 false。
+     */
+    @GameTest(maxTicks = 20)
+    public void relaxedEqualityDoesNotMergeDifferentItems(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long shelfLifeTicks = 6L * 24000L;
+
+        ItemStack bread = new ItemStack(Items.BREAD);
+        bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
+        bread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+
+        ItemStack beef = new ItemStack(Items.BEEF);
+        beef.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
+        beef.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+
+        SimpleContainer container = new SimpleContainer(2);
+        container.addItem(bread.copy());
+        container.addItem(beef.copy());
+
+        int count0 = container.getItem(0).getCount();
+        int count1 = container.getItem(1).getCount();
+        if (count0 != 1 || count1 != 1) {
+            helper.fail("expected bread+beef NOT to merge (slot0=1, slot1=1), got slot0=" + count0 + " slot1=" + count1);
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 反例 2：已腐坏（fraction = 0）的栈不应合并——canMergeRelaxed 要求双方
+     * {@code fraction > 0}。SPOILED 食物即使同 item 也不放宽。
+     */
+    @GameTest(maxTicks = 20)
+    public void relaxedEqualityDoesNotMergeSpoiled(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long shelfLifeTicks = 6L * 24000L;
+        long spoiledAge = shelfLifeTicks + 1L; // 完全过期 → fraction 0
+
+        ItemStack fresh = new ItemStack(Items.BREAD);
+        fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
+        fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+
+        ItemStack spoiled = new ItemStack(Items.BREAD);
+        spoiled.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
+        spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - spoiledAge));
+
+        double fFresh = FreshnessMath.fraction(now, fresh.get(BiteComponents.FRESHNESS), fresh.get(BiteComponents.SHELF_LIFE));
+        double fSpoiled = FreshnessMath.fraction(now, spoiled.get(BiteComponents.FRESHNESS), spoiled.get(BiteComponents.SHELF_LIFE));
+        if (fFresh <= 0.0 || fSpoiled > 0.0) {
+            helper.fail("test setup invariant violated: fFresh=" + fFresh + " fSpoiled=" + fSpoiled + " (need fFresh>0, fSpoiled<=0)");
+            return;
+        }
+
+        SimpleContainer container = new SimpleContainer(2);
+        container.addItem(fresh.copy());
+        container.addItem(spoiled.copy());
+
+        int count0 = container.getItem(0).getCount();
+        int count1 = container.getItem(1).getCount();
+        if (count0 != 1 || count1 != 1) {
+            helper.fail("expected fresh+spoiled NOT to merge (slot0=1, slot1=1), got slot0=" + count0 + " slot1=" + count1);
+            return;
+        }
+        helper.succeed();
     }
 }
