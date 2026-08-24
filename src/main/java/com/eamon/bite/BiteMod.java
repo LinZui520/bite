@@ -4,6 +4,7 @@ import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.ShelfLife;
 import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.freshness.FreshnessClock;
+import com.eamon.bite.freshness.FreshnessScanner;
 import com.eamon.bite.freshness.FreshnessStamper;
 import com.eamon.bite.freshness.ShelfLifeRegistry;
 import net.fabricmc.api.ModInitializer;
@@ -25,6 +26,7 @@ public class BiteMod implements ModInitializer {
         BiteComponents.FRESHNESS.getClass(); // 触发静态注册
         registerDefaultShelfLife();
         registerLootDropStamping();
+        registerLazyScan();
         ServerTickEvents.END_SERVER_TICK.register(server ->
             FreshnessClock.update(server.overworld().getGameTime()));
         LOGGER.info("Because It's Too Easy initialized");
@@ -66,6 +68,21 @@ public class BiteMod implements ModInitializer {
             for (ItemStack drop : drops) {
                 FreshnessStamper.stamp(drop, now);
             }
+        });
+    }
+
+    /**
+     * 懒扫描：每 {@code scanIntervalTicks} 刻扫描一次在线玩家背包、已加载区块容器、容器实体。
+     *
+     * <p>使用 {@link ServerTickEvents#END_LEVEL_TICK} 逐维度触发，门控条件：
+     * {@code level.getGameTime() % scanIntervalTicks == 0 && enabled}。
+     */
+    private static void registerLazyScan() {
+        ServerTickEvents.END_LEVEL_TICK.register(level -> {
+            ServerConfig cfg = ServerConfig.get();
+            if (!cfg.enabled()) return;
+            if (level.getGameTime() % cfg.scanIntervalTicks() != 0) return;
+            FreshnessScanner.scanLevel(level, level.getGameTime());
         });
     }
 }
