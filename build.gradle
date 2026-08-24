@@ -22,6 +22,17 @@ loom {
 	}
 }
 
+// GameTest source set (Loom 1.17 FabricApiExtension.configureTests).
+// GameTestSettings exposes Property<Boolean>/Property<String>, so values
+// are set via .set(...) rather than the Groovy assignment shorthand in the brief.
+fabricApi {
+	configureTests {
+		createSourceSet.set(true)
+		modId.set("bite-gametest")
+		eula.set(true)
+	}
+}
+
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
@@ -35,6 +46,16 @@ dependencies {
 }
 
 processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+// Expand ${version} in the gametest source set's fabric.mod.json too.
+processGametestResources {
 	def version = project.version
 	inputs.property "version", version
 

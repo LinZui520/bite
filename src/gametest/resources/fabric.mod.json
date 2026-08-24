@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "bite-gametest",
+  "version": "${version}",
+  "name": "Bite GameTest",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["com.eamon.bite.test.FreshnessGameTests"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "fabric-api": "*",
+    "bite": "*"
+  }
+}
