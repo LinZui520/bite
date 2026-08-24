@@ -3,7 +3,13 @@
   "package": "com.eamon.bite.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
-    "ItemStackMixin"
+    "ItemStackMixin",
+    "SlotMixin",
+    "InventoryMixin",
+    "ItemEntityMixin",
+    "SimpleContainerMixin",
+    "AbstractContainerMenuMixin",
+    "HopperBlockEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1

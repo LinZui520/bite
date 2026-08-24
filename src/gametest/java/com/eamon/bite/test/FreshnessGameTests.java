@@ -18,6 +18,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
@@ -188,6 +189,147 @@ public class FreshnessGameTests {
             return;
         }
         helper.succeed();
+    }
+
+    /**
+     * 加权平均合并重算（Task 10）：stale bread x3 (10%) + fresh bread x1 (100%)
+     * 经 {@link SimpleContainer#addItem} 合并后，dest 数量 4、新鲜度应为
+     * {@code (0.1*3 + 1.0*1) / 4 = 0.325}（±0.01）。
+     *
+     * <p>验证链路：
+     * <ul>
+     *   <li>{@code addItem → moveItemToOccupiedSlotsWithSameType →
+     *       ItemStack.isSameItemSameComponents}（Task 9 放宽判定通过，不同 stamp 仍可合并）</li>
+     *   <li>{@code moveItemsBetweenStacks(source, destination)} —— Task 10
+     *       {@code SimpleContainerMixin} 在 HEAD 快照 destination 的 stamp/count，
+     *       TAIL 调用 {@link StackingRules#reconcile} 反解加权平均时间戳。</li>
+     *   <li>显式设置 {@code SHELF_LIFE}（task 要求解确定性；reconcile 读取 dest 的 SHELF_LIFE）。</li>
+     * </ul>
+     *
+     * <p>注意：{@link FreshnessClock#update} 必须在断言前同步——reconcile 内部走
+     * {@code FreshnessClock.now()}，而 gametest 服务器由 END_SERVER_TICK 异步更新。
+     */
+    @GameTest(maxTicks = 20)
+    public void mergeIsWeightedAverage(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long life = 24000L * 6; // bread 6 days
+
+        ItemStack stale = new ItemStack(Items.BREAD, 3);
+        stale.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        stale.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.9))); // fraction 0.1
+
+        ItemStack fresh = new ItemStack(Items.BREAD, 1);
+        fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now)); // fraction 1.0
+
+        // 预检：分数符合预期，避免 setup 误差被误判为 mixin bug
+        double fStale = FreshnessMath.fraction(now, stale.get(BiteComponents.FRESHNESS), stale.get(BiteComponents.SHELF_LIFE));
+        double fFresh = FreshnessMath.fraction(now, fresh.get(BiteComponents.FRESHNESS), fresh.get(BiteComponents.SHELF_LIFE));
+        if (Math.abs(fStale - 0.1) > 0.001 || Math.abs(fFresh - 1.0) > 0.001) {
+            helper.fail("test setup invariant violated: fStale=" + fStale + " fFresh=" + fFresh);
+            return;
+        }
+
+        SimpleContainer container = new SimpleContainer(9);
+        container.addItem(stale.copy());
+        container.addItem(fresh.copy());
+
+        ItemStack merged = container.getItem(0);
+        if (merged.getCount() != 4) {
+            helper.fail("expected merged count 4 (stale x3 + fresh x1), got " + merged.getCount());
+            return;
+        }
+        FreshnessStamp stamp = merged.get(BiteComponents.FRESHNESS);
+        if (stamp == null) {
+            helper.fail("merged stack missing FRESHNESS component");
+            return;
+        }
+        double expected = (0.1 * 3 + 1.0 * 1) / 4.0; // 0.325
+        double actual = FreshnessMath.fraction(now, stamp, new ShelfLife(life));
+        if (Math.abs(expected - actual) > 0.01) {
+            helper.fail("merged freshness " + actual + " != expected " + expected + " (±0.01 tolerance)");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 漏斗合并重算（Task 10 补充站点）：漏斗从上方箱子吸取不同新鲜度面包时，
+     * 合并发生在 {@code HopperBlockEntity.tryMoveInItem}（brief 5 站点表把漏斗
+     * 错误映射到 SimpleContainer.moveItemsBetweenStacks，genSources 修正）。
+     *
+     * <p>验证链路：
+     * <ul>
+     *   <li>箱子 slot 0 = stale bread x1 (10%)，slot 1 = fresh bread x1 (100%)</li>
+     *   <li>漏斗置于箱子下方，每 8 tick 吸取 1 件</li>
+     *   <li>第 1 周期：吸 stale → 漏斗 slot 0 = stale x1</li>
+     *   <li>第 2 周期：吸 fresh → {@code tryMoveInItem} 合并到漏斗 slot 0（dest grew），
+     *       {@code HopperBlockEntityMixin} reconcile → 加权平均</li>
+     *   <li>期望 fraction = (0.1*1 + 1.0*1) / 2 = 0.55 ± 0.02</li>
+     * </ul>
+     *
+     * <p>期望值在 assert 时用 {@code FreshnessClock.now()} 同步计算，消除 tick 漂移。
+     */
+    @GameTest(maxTicks = 80)
+    public void hopperMergeIsWeightedAverage(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long life = 24000L * 6;
+
+        ItemStack stale = new ItemStack(Items.BREAD, 1);
+        stale.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        stale.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.9)));
+
+        ItemStack fresh = new ItemStack(Items.BREAD, 1);
+        fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.CHEST);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.HOPPER);
+
+        ChestBlockEntity chest = helper.getBlockEntity(new BlockPos(1, 2, 1), ChestBlockEntity.class);
+        if (chest == null) {
+            helper.fail("chest block entity not created");
+            return;
+        }
+        chest.setItem(0, stale.copy());
+        chest.setItem(1, fresh.copy());
+
+        // 漏斗冷却 8 tick/周期，2 件需 ~20 tick；留余量到 60 tick
+        final FreshnessStamp staleStamp = stale.get(BiteComponents.FRESHNESS);
+        final FreshnessStamp freshStamp = fresh.get(BiteComponents.FRESHNESS);
+        final ShelfLife shelfLife = new ShelfLife(life);
+        helper.startSequence()
+            .thenExecuteAfter(60, () -> {
+                HopperBlockEntity hopper = helper.getBlockEntity(new BlockPos(1, 1, 1), HopperBlockEntity.class);
+                if (hopper == null) {
+                    helper.fail("hopper block entity not created");
+                    return;
+                }
+                ItemStack merged = hopper.getItem(0);
+                if (merged.getCount() != 2) {
+                    helper.fail("expected hopper slot 0 count 2 (stale+fresh), got " + merged.getCount());
+                    return;
+                }
+                FreshnessStamp stamp = merged.get(BiteComponents.FRESHNESS);
+                if (stamp == null) {
+                    helper.fail("hopper merged stack missing FRESHNESS component");
+                    return;
+                }
+                long nowAssert = FreshnessClock.now();
+                double fStale = FreshnessMath.fraction(nowAssert, staleStamp, shelfLife);
+                double fFresh = FreshnessMath.fraction(nowAssert, freshStamp, shelfLife);
+                double expected = (fStale + fFresh) / 2.0;
+                double actual = FreshnessMath.fraction(nowAssert, stamp, shelfLife);
+                if (Math.abs(expected - actual) > 0.02) {
+                    helper.fail("hopper merged freshness " + actual + " != expected " + expected + " (±0.02 tolerance)");
+                    return;
+                }
+            })
+            .thenSucceed();
     }
 
     /**
