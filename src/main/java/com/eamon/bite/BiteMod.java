@@ -1,9 +1,11 @@
 package com.eamon.bite;
 
 import com.eamon.bite.component.BiteComponents;
+import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.freshness.FreshnessClock;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +15,7 @@ public class BiteMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        ServerConfig.load(FabricLoader.getInstance().getConfigDir());
         BiteComponents.FRESHNESS.getClass(); // 触发静态注册
         ServerTickEvents.END_SERVER_TICK.register(server ->
             FreshnessClock.update(server.overworld().getGameTime()));
