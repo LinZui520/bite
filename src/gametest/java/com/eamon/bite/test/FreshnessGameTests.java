@@ -17,6 +17,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.storage.loot.LootParams;
@@ -367,6 +368,89 @@ public class FreshnessGameTests {
         int count1 = container.getItem(1).getCount();
         if (count0 != 1 || count1 != 1) {
             helper.fail("expected fresh+spoiled NOT to merge (slot0=1, slot1=1), got slot0=" + count0 + " slot1=" + count1);
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 进食营养缩放（Task 11）：STALE 食物（fraction 0.4）应按 nutritionScaleStale
+     * （默认 0.75）缩放营养增量。
+     *
+     * <p>验证链路：
+     * <ul>
+     *   <li>面包 nutrition=5（genSources: {@code Foods.BREAD = Builder.nutrition(5).saturationModifier(0.6F).build()}）</li>
+     *   <li>初始 foodLevel=10；原版 eat 后 → 10+5=15</li>
+     *   <li>STALE scale 0.75 → delta 5*0.75=3.75 → round 4 → 10+4=14</li>
+     *   <li>fraction 0.4 ∈ (oldThreshold=0.25, staleThreshold=0.5] → STALE → scale 0.75 ✓</li>
+     * </ul>
+     *
+     * <p>26.2 适配：brief 使用 {@code makeTallerMockPlayer}——26.2 GameTestHelper 无此方法，
+     * 改用 {@link GameTestHelper#makeMockPlayer(GameType)}（返回 {@link net.minecraft.world.entity.player.Player}）。
+     * Player 拥有 FoodData，finishUsingItem 链路
+     * {@code ItemStack.finishUsingItem → Item.finishUsingItem → Consumable.onConsume
+     * → FoodProperties.onConsume → player.getFoodData().eat(this)} 正常触发。
+     *
+     * <p>显式设置 SHELF_LIFE + FreshnessClock.update 以保证确定性
+     * （mixin RETURN 通过 {@link FreshnessClock#now()} 计算 fraction）。
+     */
+    @GameTest(maxTicks = 20)
+    public void staleFoodGivesReducedNutrition(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long life = 24000L * 6; // bread 默认 6 天
+
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.getFoodData().setFoodLevel(10);
+
+        ItemStack bread = new ItemStack(Items.BREAD);
+        bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        bread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.6))); // 40% → STALE → 75% 营养
+
+        // 预检：fraction 确为 0.4，避免 setup 误差
+        double fraction = FreshnessMath.fraction(now,
+            bread.get(BiteComponents.FRESHNESS), bread.get(BiteComponents.SHELF_LIFE));
+        if (Math.abs(fraction - 0.4) > 0.001) {
+            helper.fail("test setup invariant violated: fraction=" + fraction + " (expected 0.4)");
+            return;
+        }
+
+        bread.finishUsingItem(level, player);
+
+        int foodLevel = player.getFoodData().getFoodLevel();
+        // 面包营养 5 → 5 * 0.75 = 3.75 → round 4 → 10 + 4 = 14
+        if (foodLevel != 14) {
+            helper.fail("stale bread should give 75% nutrition (foodLevel=14), got " + foodLevel);
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 新鲜食物满营养（Task 11 对照组）：FRESH 食物（fraction 1.0）应保持原版营养。
+     *
+     * <p>初始 foodLevel=10；面包 nutrition=5；eat 后 → 10+5=15（无缩放）。
+     */
+    @GameTest(maxTicks = 20)
+    public void freshFoodGivesFullNutrition(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long life = 24000L * 6;
+
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.getFoodData().setFoodLevel(10);
+
+        ItemStack bread = new ItemStack(Items.BREAD);
+        bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        bread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now)); // fraction 1.0 → FRESH
+
+        bread.finishUsingItem(level, player);
+
+        int foodLevel = player.getFoodData().getFoodLevel();
+        if (foodLevel != 15) {
+            helper.fail("fresh bread should give full nutrition (foodLevel=15), got " + foodLevel);
             return;
         }
         helper.succeed();
