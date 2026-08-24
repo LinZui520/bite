@@ -1,6 +1,11 @@
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
+	// Publishing plugins — declared but not applied here (apply false).
+	// Applied only inside the env guards at the bottom of this file, so the
+	// build is inert without ~/.gradle/gradle.properties credentials.
+	id 'com.modrinth.minotaur' version '2.+' apply false
+	id 'net.darkhax.curseforgegradle' version '1.3.33' apply false
 }
 
 repositories {
@@ -106,4 +111,40 @@ publishing {
 
 test {
 	useJUnitPlatform()
+}
+
+// ---------------------------------------------------------------------------
+// Publishing pipeline (debug-guarded, inert without credentials).
+// Tokens live in ~/.gradle/gradle.properties (user-global, OUTSIDE the repo):
+//   modrinth_token=...   curseforge_token=...
+// NEVER commit tokens. Project IDs must be filled in after creating the
+// Modrinth/CurseForge projects.
+// ---------------------------------------------------------------------------
+if (project.hasProperty('modrinth_token')) {
+	apply plugin: 'com.modrinth.minotaur'
+	modrinth {
+		token = project.modrinth_token
+		projectId = 'REPLACE_WITH_MODRINTH_ID'   // 在 Modrinth 建项目后填 slug/ID
+		versionNumber = project.findProperty('mod_path_version') ?: project.version
+		versionType = 'release'
+		changelog = file('CHANGELOG.md').exists() ? file('CHANGELOG.md').text : 'Initial release'
+		uploadFile = tasks.jar    // 26.x 用 jar（非 remapJar）
+		gameVersions = ['26.2']
+		loaders = ['fabric']
+		dependencies { required.project 'fabric-api' }
+	}
+}
+
+if (project.hasProperty('curseforge_token')) {
+	apply plugin: 'net.darkhax.curseforgegradle'
+	tasks.register('curseforge', net.darkhax.curseforgegradle.TaskPublishCurseForge) {
+		apiToken = project.curseforge_token
+		projectId = '000000'      // 在 CurseForge 建项目后填数字 ID
+		releaseType = 'release'
+		addGameVersion '26.2'
+		addModLoader 'Fabric'
+		addEnvironment 'Client', 'Server'   // 2026-07 起 CF 强制环境标签
+		relations { required 'fabric-api' }
+		mainArtifact(tasks.jar)
+	}
 }
