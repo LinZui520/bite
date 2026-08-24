@@ -55,13 +55,19 @@ public record ServerConfig(
         ServerConfig d = DEFAULT;
         Map<String, Integer> shelf = raw.shelf_life_days == null ? new LinkedHashMap<>(d.shelfLifeDays) : raw.shelf_life_days;
         if (!shelf.containsKey("default")) shelf.put("default", 7);
+        int scanInterval = Math.max(1, orDefault(raw.scan_interval_ticks, d.scanIntervalTicks));
+        double stale = orDefault(raw.stale_threshold, d.staleThreshold);
+        double old = orDefault(raw.old_threshold, d.oldThreshold);
+        if (stale > 0.0 && old > 0.0 && stale <= old) {
+            stale = Math.max(old + 0.01, stale);
+        }
         return new ServerConfig(
             orDefault(raw.enabled, d.enabled),
-            orDefault(raw.scan_interval_ticks, d.scanIntervalTicks),
+            scanInterval,
             shelf,
             raw.item_overrides == null ? new TreeMap<>(d.itemOverrides) : raw.item_overrides,
-            orDefault(raw.stale_threshold, d.staleThreshold),
-            orDefault(raw.old_threshold, d.oldThreshold),
+            stale,
+            old,
             orDefault(raw.nutrition_scale_stale, d.nutritionScaleStale),
             orDefault(raw.nutrition_scale_old, d.nutritionScaleOld),
             orDefault(raw.hunger_effect_chance, d.hungerEffectChance),

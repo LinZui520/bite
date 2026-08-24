@@ -59,4 +59,17 @@ class ServerConfigTest {
         assertEquals(-1, ov.get("minecraft:spider_eye"));
         assertEquals(-1, ov.get("minecraft:poisonous_potato"));
     }
+
+    @Test
+    void scanIntervalTicksZeroClampsToOne() {
+        String json = """
+            {
+              "enabled": true,
+              "scan_interval_ticks": 0
+            }
+            """;
+        ServerConfig cfg = ServerConfig.fromJson(json);
+        assertEquals(1, cfg.scanIntervalTicks(),
+            "scan_interval_ticks=0 must clamp to 1 to avoid ArithmeticException in modulo gate");
+    }
 }

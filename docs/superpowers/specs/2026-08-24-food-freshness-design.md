@@ -279,6 +279,11 @@ mixin `Consumable.onConsume`（26.2 验证：所有食物进食的统一咽喉�
 - 生物吃腐坏食物（僵尸等）：v1 一视同仁走相同逻辑（简单）；后续版本可配置
 - 配置项：惩罚曲线三档阈值、debuff 概率、腐坏是否绝对禁食（默认禁食）
 
+> **实现记录（2026-08-25 终审）：** §8 原文「生物吃腐坏食物：v1 一视同仁走相同逻辑」在实现时收窄。
+> v1.0.0 的禁食拦截锚定在 `UseItemCallback`（玩家右键使用），仅作用于玩家进食路径
+> （`BiteMod.isSpoiledInedible` 判定 + `Consumable.onConsume` 营养缩放 mixin 同理）。
+> 生物进食的 mob parity 延后至 v1.1（与 `/bite reload` 等同期）。spec 与实现以此记录对齐。
+
 ---
 
 ## 9. 配置（手写 Gson JSON，零第三方依赖）

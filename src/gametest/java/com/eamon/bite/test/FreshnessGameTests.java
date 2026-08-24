@@ -3,6 +3,7 @@ package com.eamon.bite.test;
 import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.component.ShelfLife;
+import com.eamon.bite.BiteMod;
 import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.freshness.FreshnessMath;
@@ -516,6 +517,63 @@ public class FreshnessGameTests {
                 + " (75% of fresh " + controlSatDelta + "), got " + satDelta);
             return;
         }
+        helper.succeed();
+    }
+
+    /**
+     * 变质禁食判定（终审补充）：覆盖 UseItemCallback 拦截分支的唯一未覆盖 gameplay 路径。
+     *
+     * <p>UseItemCallback 由玩家右键交互触发，gametest 无法直接驱动玩家输入；
+     * 故测试回调所调用的<b>决策函数</b> {@link BiteMod#isSpoiledInedible}（终审抽出，
+     * 回调与测试共享同一判定）。四个断言覆盖全部分支：
+     * <ul>
+     *   <li>spoiled food（FRESHNESS 早于 shelf life → fraction 0）→ <b>true</b>（阻止进食）</li>
+     *   <li>fresh food（fraction 1.0）→ <b>false</b></li>
+     *   <li>unstamped food（无 FRESHNESS）→ <b>false</b>（原版行为）</li>
+     *   <li>never-spoil food（SHELF_LIFE spoilTicks ≤ 0）→ <b>false</b>（豁免）</li>
+     * </ul>
+     */
+    @GameTest(maxTicks = 20)
+    public void spoiledInedibleDecision(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long life = 24000L * 6; // bread 6 days
+
+        // (1) spoiled: stamp older than shelf life → fraction 0
+        ItemStack spoiled = new ItemStack(Items.BREAD);
+        spoiled.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1L));
+        if (!BiteMod.isSpoiledInedible(spoiled, now)) {
+            helper.fail("spoiled food (fraction 0) should be inedible → true");
+            return;
+        }
+
+        // (2) fresh: fraction 1.0
+        ItemStack fresh = new ItemStack(Items.BREAD);
+        fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+        if (BiteMod.isSpoiledInedible(fresh, now)) {
+            helper.fail("fresh food (fraction 1.0) should not be inedible → false");
+            return;
+        }
+
+        // (3) unstamped: no FRESHNESS component
+        ItemStack unstamped = new ItemStack(Items.BREAD);
+        if (BiteMod.isSpoiledInedible(unstamped, now)) {
+            helper.fail("unstamped food (no FRESHNESS) should not be inedible → false");
+            return;
+        }
+
+        // (4) never-spoil: SHELF_LIFE spoilTicks <= 0
+        ItemStack neverSpoil = new ItemStack(Items.BREAD);
+        neverSpoil.set(BiteComponents.SHELF_LIFE, new ShelfLife(-1L));
+        neverSpoil.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1L));
+        if (BiteMod.isSpoiledInedible(neverSpoil, now)) {
+            helper.fail("never-spoil food (spoilTicks <= 0) should not be inedible → false");
+            return;
+        }
+
         helper.succeed();
     }
 }

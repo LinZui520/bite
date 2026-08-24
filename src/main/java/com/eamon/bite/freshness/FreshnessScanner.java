@@ -47,7 +47,7 @@ public final class FreshnessScanner {
                 }
             }
         });
-        // (c) 容器实体（矿车、店员等）
+        // (c) 容器实体（如箱子矿车/漏斗矿车等原版容器实体，及其他 mod 的容器实体）
         for (var entity : level.getAllEntities()) {
             if (entity instanceof Container container) {
                 scanContainer(container, now);

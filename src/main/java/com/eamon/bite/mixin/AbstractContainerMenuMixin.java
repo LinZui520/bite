@@ -58,6 +58,7 @@ public abstract class AbstractContainerMenuMixin {
 
     @Inject(method = "moveItemStackTo(Lnet/minecraft/world/item/ItemStack;IIZ)Z", at = @At("HEAD"))
     private void bite$capture(ItemStack origin, int startIndex, int endIndex, boolean fromLast, CallbackInfoReturnable<Boolean> cir) {
+        bite$snapshots.clear();
         bite$originStamp = origin.get(BiteComponents.FRESHNESS);
         if (bite$originStamp == null) return;
         AbstractContainerMenu self = (AbstractContainerMenu) (Object) this;

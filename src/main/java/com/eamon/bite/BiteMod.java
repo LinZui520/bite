@@ -92,6 +92,7 @@ public class BiteMod implements ModInitializer {
         ServerTickEvents.END_LEVEL_TICK.register(level -> {
             ServerConfig cfg = ServerConfig.get();
             if (!cfg.enabled()) return;
+            if (cfg.scanIntervalTicks() <= 0) return;
             if (level.getGameTime() % cfg.scanIntervalTicks() != 0) return;
             FreshnessScanner.scanLevel(level, level.getGameTime());
         });
@@ -123,15 +124,37 @@ public class BiteMod implements ModInitializer {
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (!ServerConfig.get().spoiledInedible()) return InteractionResult.PASS;
             ItemStack stack = player.getItemInHand(hand);
-            FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
-            if (stamp == null) return InteractionResult.PASS;
-            ShelfLife life = stack.get(BiteComponents.SHELF_LIFE);
-            if (life == null || life.spoilTicks() <= 0) return InteractionResult.PASS;
-            if (FreshnessMath.fraction(level.getGameTime(), stamp, life) > 0.0) return InteractionResult.PASS;
+            if (!isSpoiledInedible(stack, level.getGameTime())) return InteractionResult.PASS;
             if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
                 serverPlayer.sendOverlayMessage(Component.translatable("bite.msg.spoiled_inedible"));
             }
             return InteractionResult.FAIL;
         });
+    }
+
+    /**
+     * 变质禁食判定（包可见，供 gametest 直接调用）。
+     *
+     * <p>抽出为独立纯函数，使 UseItemCallback 回调与 gametest 共享同一决策逻辑：
+     * <ul>
+     *   <li>无 FRESHNESS 戳 → false（原版行为，未打标食物不受禁食约束）</li>
+     *   <li>无 SHELF_LIFE 或 spoilTicks ≤ 0 → false（永不腐坏豁免）</li>
+     *   <li>fraction &gt; 0（未完全变质）→ false</li>
+     *   <li>fraction ≤ 0（已完全变质）→ true（应阻止进食）</li>
+     * </ul>
+     *
+     * <p>实现记录（spec §8）：本判定仅作用于玩家进食路径（UseItemCallback / 玩家右键使用）。
+     * 生物进食（僵尸等）的 mob parity 延后至 v1.1。
+     *
+     * @param stack 待判定物品栈
+     * @param now   当前游戏刻（服务端权威时间）
+     * @return 若该栈已完全变质且应被禁食则返回 true
+     */
+    public static boolean isSpoiledInedible(ItemStack stack, long now) {
+        FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
+        if (stamp == null) return false;
+        ShelfLife life = stack.get(BiteComponents.SHELF_LIFE);
+        if (life == null || life.spoilTicks() <= 0) return false;
+        return FreshnessMath.fraction(now, stamp, life) <= 0.0;
     }
 }
