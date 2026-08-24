@@ -1,5 +1,6 @@
 package com.eamon.bite;
 
+import com.eamon.bite.command.BiteCommands;
 import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.component.ShelfLife;
@@ -36,6 +37,7 @@ public class BiteMod implements ModInitializer {
         registerLootDropStamping();
         registerLazyScan();
         registerSpoiledFoodBlock();
+        BiteCommands.register();
         ServerTickEvents.END_SERVER_TICK.register(server ->
             FreshnessClock.update(server.overworld().getGameTime()));
         LOGGER.info("Because It's Too Easy initialized");
