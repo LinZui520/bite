@@ -3,5 +3,14 @@
   "bite.tooltip.spoiled": "Spoiled",
   "bite.msg.spoiled_inedible": "This food has spoiled and can't be eaten.",
   "bite.time.days": "~%1$s days",
-  "bite.time.hours": "~%1$s hours"
+  "bite.time.hours": "~%1$s hours",
+  "bite.cmd.freshness.header": "Freshness report for %1$s",
+  "bite.cmd.freshness.no_food": "Hold a food item to inspect it.",
+  "bite.cmd.freshness.stamp": "Created at tick %1$s",
+  "bite.cmd.freshness.life": "Shelf life: %1$s days",
+  "bite.cmd.freshness.fraction": "Freshness: %1$s%%",
+  "bite.cmd.freshness.never": "Never spoils",
+  "modmenu.nameTranslation.bite": "Because It's Too Easy",
+  "modmenu.summaryTranslation.bite": "Food spoilage survival mechanics",
+  "modmenu.descriptionTranslation.bite": "Food spoils over time, merges by weighted-average freshness, and stale meals bite back. Survival was too easy."
 }

@@ -3,5 +3,14 @@
   "bite.tooltip.spoiled": "已变质",
   "bite.msg.spoiled_inedible": "这食物已经变质了，不能吃。",
   "bite.time.days": "约 %1$s 天",
-  "bite.time.hours": "约 %1$s 小时"
+  "bite.time.hours": "约 %1$s 小时",
+  "bite.cmd.freshness.header": "%1$s 的新鲜度报告",
+  "bite.cmd.freshness.no_food": "手持食物后再查询。",
+  "bite.cmd.freshness.stamp": "生产于第 %1$s 刻",
+  "bite.cmd.freshness.life": "保质期：%1$s 天",
+  "bite.cmd.freshness.fraction": "新鲜度：%1$s%%",
+  "bite.cmd.freshness.never": "永不腐坏",
+  "modmenu.nameTranslation.bite": "Because It's Too Easy（生存哪有这么容易）",
+  "modmenu.summaryTranslation.bite": "食物腐坏生存机制",
+  "modmenu.descriptionTranslation.bite": "食物随时间腐坏，堆叠按加权平均新鲜度合并，吃不新鲜的东西会吃苦头。生存模式太容易了。"
 }
