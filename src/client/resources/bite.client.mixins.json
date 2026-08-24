@@ -2,7 +2,9 @@
   "required": true,
   "package": "com.eamon.bite.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": [],
+  "client": [
+    "ItemStackBarMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },
