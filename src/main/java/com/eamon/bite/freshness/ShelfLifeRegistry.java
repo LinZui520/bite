@@ -1,7 +1,5 @@
 package com.eamon.bite.freshness;
 
-import com.eamon.bite.component.BiteComponents;
-import com.eamon.bite.component.ShelfLife;
 import com.eamon.bite.config.ServerConfig;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -48,13 +46,14 @@ public final class ShelfLifeRegistry {
      * @return 游戏刻；-1 = 永不腐坏或非食物
      */
     public static long resolveShelfLifeTicks(Item item) {
+        ServerConfig config = ServerConfig.get();
         String id = describe(item);
-        Integer override = ServerConfig.get().itemOverrides().get(id);
+        Integer override = config.itemOverrides().get(id);
         if (override != null) return override < 0 ? -1 : override * DAY;
         if (!isFood(item)) return -1;
         String cat = categoryOf(item);
-        Integer days = ServerConfig.get().shelfLifeDays().get(cat);
-        if (days == null) days = ServerConfig.get().shelfLifeDays().get("default");
+        Integer days = config.shelfLifeDays().get(cat);
+        if (days == null) days = config.shelfLifeDays().get("default");
         if (days == null || days < 0) return -1;
         return days * DAY;
     }
