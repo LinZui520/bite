@@ -455,4 +455,67 @@ public class FreshnessGameTests {
         }
         helper.succeed();
     }
+
+    /**
+     * 满食欲路径（Task 11 review r1 修复）：foodLevel=20 时原版 FoodData.add 把
+     * 营养增量钳制为 0（delta=0），但<b>仍添加饱和度</b>——饱和度缩放不得因
+     * delta=0 被跳过，否则满食欲吃 STALE 食物获得全额饱和度（bypass）。
+     *
+     * <p>结构（对照组-治疗组，避免硬编码原版数值）：
+     * <ul>
+     *   <li>对照：food=20 吃 FRESH 面包（scale=1.0，mixin 不介入）→
+     *       测原版饱和度增量 satDeltaFresh
+     *       （面包 saturation = 5*0.6*2 = 6.0，genSources Foods.BREAD +
+     *       FoodConstants.saturationByModifier）</li>
+     *   <li>治疗：food=20 吃 STALE 面包（fraction 0.4 → scale 0.75）→
+     *       饱和度增量应为 satDeltaFresh * 0.75</li>
+     *   <li>food 应保持 20（原版 clamp；delta=0 时 mixin 不动 foodLevel）</li>
+     * </ul>
+     *
+     * <p>对照断言 {@code controlSatDelta > 0} 防止关系断言空转
+     * （若对照增量为 0，0 == 0*0.75 会假通过）。
+     */
+    @GameTest(maxTicks = 20)
+    public void staleFoodAtFoodCapStillScalesSaturation(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        FreshnessClock.update(level.getGameTime());
+        long now = FreshnessClock.now();
+        long life = 24000L * 6;
+
+        // 对照组：food=20 吃 FRESH 面包（scale=1.0，mixin 不介入）
+        net.minecraft.world.entity.player.Player control = helper.makeMockPlayer(GameType.SURVIVAL);
+        control.getFoodData().setFoodLevel(20);
+        float controlSatBefore = control.getFoodData().getSaturationLevel();
+        ItemStack freshBread = new ItemStack(Items.BREAD);
+        freshBread.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        freshBread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+        freshBread.finishUsingItem(level, control);
+        float controlSatDelta = control.getFoodData().getSaturationLevel() - controlSatBefore;
+        if (controlSatDelta <= 0.0f) {
+            helper.fail("control (fresh bread at food cap) should gain saturation, got delta " + controlSatDelta);
+            return;
+        }
+
+        // 治疗组：food=20 吃 STALE 面包（fraction 0.4 → scale 0.75）
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.getFoodData().setFoodLevel(20);
+        float satBefore = player.getFoodData().getSaturationLevel();
+        ItemStack staleBread = new ItemStack(Items.BREAD);
+        staleBread.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        staleBread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.6)));
+        staleBread.finishUsingItem(level, player);
+
+        if (player.getFoodData().getFoodLevel() != 20) {
+            helper.fail("food level should stay at cap 20, got " + player.getFoodData().getFoodLevel());
+            return;
+        }
+        float satDelta = player.getFoodData().getSaturationLevel() - satBefore;
+        float expected = controlSatDelta * 0.75f;
+        if (Math.abs(satDelta - expected) > 0.0001f) {
+            helper.fail("stale bread saturation delta should be " + expected
+                + " (75% of fresh " + controlSatDelta + "), got " + satDelta);
+            return;
+        }
+        helper.succeed();
+    }
 }

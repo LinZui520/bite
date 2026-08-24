@@ -7,6 +7,7 @@ import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.freshness.FreshnessMath;
 import com.eamon.bite.freshness.SpoiledFoodHandler;
+import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -24,6 +25,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * 进食惩罚 mixin（spec §8）：在 {@code ItemStack.finishUsingItem} 的 HEAD 捕获
  * 玩家 FoodData 快照，RETURN 处按新鲜度缩放营养增量 + 饱和度增量，
  * 并在 OLD 区间概率施加「饥饿」debuff。
+ *
+ * <p>缩放语义（review r1 修正后）：
+ * <ul>
+ *   <li>营养增量：仅 delta &gt; 0 时缩放（delta=0 为满食欲被原版 clamp 的 no-op）</li>
+ *   <li>饱和度增量：<b>独立于 delta</b>——满食欲（delta=0）时原版
+ *       {@code FoodData.eat} 仍添加饱和度，此处必须照样缩放，
+ *       否则满食欲吃 STALE 食物获得全额饱和度（bypass）</li>
+ *   <li>饱和度上限：缩放后钳制到新 foodLevel，对齐原版
+ *       {@code FoodData.add} 的 {@code clamp(sat, 0, foodLevel)} 语义</li>
+ * </ul>
  *
  * <p>26.2 检查点（genSources 验证）：
  * <ul>
@@ -73,12 +84,21 @@ public abstract class ItemStackFinishMixin {
         if (!(entity instanceof Player player)) return;
         double fraction = FreshnessMath.fraction(FreshnessClock.now(), bite$stamp, bite$life);
         double scale = SpoiledFoodHandler.nutritionScale(fraction);
-        FoodData food = player.getFoodData();
-        int delta = food.getFoodLevel() - bite$foodBefore;
-        if (delta > 0 && scale < 1.0) {
-            food.setFoodLevel(bite$foodBefore + (int) Math.round(delta * scale));
+        if (scale < 1.0) {
+            FoodData food = player.getFoodData();
+            // 营养缩放：delta=0（满食欲被原版 clamp）时为 no-op，跳过
+            int delta = food.getFoodLevel() - bite$foodBefore;
+            if (delta > 0) {
+                food.setFoodLevel(bite$foodBefore + (int) Math.round(delta * scale));
+            }
+            // 饱和度缩放：独立于 delta——满食欲（delta=0）时原版仍加饱和度，
+            // 必须照样缩放（review r1 critical fix）
             float satDelta = food.getSaturationLevel() - bite$saturationBefore;
-            food.setSaturation(Math.max(0.0f, bite$saturationBefore + satDelta * (float) scale));
+            if (satDelta != 0.0f) {
+                float scaled = bite$saturationBefore + satDelta * (float) scale;
+                // 对齐原版 FoodData.add 语义：饱和度上限 = 缩放后的 foodLevel
+                food.setSaturation(Mth.clamp(scaled, 0.0F, food.getFoodLevel()));
+            }
         }
         if (SpoiledFoodHandler.shouldApplyHunger(fraction)) {
             player.addEffect(new MobEffectInstance(MobEffects.HUNGER,
