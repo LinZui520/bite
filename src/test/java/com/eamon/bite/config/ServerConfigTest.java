@@ -79,9 +79,21 @@ class ServerConfigTest {
         Map<String, Integer> ov = ServerConfig.DEFAULT.itemOverrides();
         assertEquals(-1, ov.get("minecraft:golden_apple"));
         assertEquals(-1, ov.get("minecraft:enchanted_golden_apple"));
-        assertEquals(-1, ov.get("minecraft:rotten_flesh"));
+        // 药水/牛奶/金胡萝卜不需要新鲜度（用户口径 v1.0.4）
+        assertEquals(-1, ov.get("minecraft:potion"));
+        assertEquals(-1, ov.get("minecraft:milk_bucket"));
+        assertEquals(-1, ov.get("minecraft:golden_carrot"));
         assertEquals(-1, ov.get("minecraft:spider_eye"));
         assertEquals(-1, ov.get("minecraft:poisonous_potato"));
+    }
+
+    @Test
+    void cakeAndRottenFleshHaveFreshness() {
+        Map<String, Integer> ov = ServerConfig.DEFAULT.itemOverrides();
+        // 蛋糕需要新鲜度（料理档 15 天）
+        assertEquals(15, ov.get("minecraft:cake"));
+        // 腐肉需要新鲜度，40 天（原为豁免；用户口径 v1.0.4）
+        assertEquals(40, ov.get("minecraft:rotten_flesh"));
     }
 
     @Test

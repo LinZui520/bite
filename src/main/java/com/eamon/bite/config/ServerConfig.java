@@ -47,9 +47,16 @@ public record ServerConfig(
         // 豁免（永不腐坏）
         overrides.put("minecraft:golden_apple", -1);
         overrides.put("minecraft:enchanted_golden_apple", -1);
-        overrides.put("minecraft:rotten_flesh", -1);
+        // 药水/牛奶/金胡萝卜不需要新鲜度（v1.0.4 用户口径）
+        overrides.put("minecraft:potion", -1);
+        overrides.put("minecraft:milk_bucket", -1);
+        overrides.put("minecraft:golden_carrot", -1);
         overrides.put("minecraft:spider_eye", -1);
         overrides.put("minecraft:poisonous_potato", -1);
+        // 腐肉需要新鲜度：40 天（v1.0.4 用户口径，原为豁免）
+        overrides.put("minecraft:rotten_flesh", 40);
+        // 蛋糕需要新鲜度：料理档 15 天
+        overrides.put("minecraft:cake", 15);
         // 烤制浆果坏得快（饥荒：浆果 6 → 烤浆果 3）
         overrides.put("minecraft:sweet_berries", 6);
         overrides.put("minecraft:glow_berries", 6);
