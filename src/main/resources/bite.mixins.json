@@ -10,7 +10,8 @@
     "ItemEntityMixin",
     "SimpleContainerMixin",
     "AbstractContainerMenuMixin",
-    "HopperBlockEntityMixin"
+    "HopperBlockEntityMixin",
+    "AbstractFurnaceBlockEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1

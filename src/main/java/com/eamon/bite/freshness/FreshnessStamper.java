@@ -34,4 +34,33 @@ public final class FreshnessStamper {
         if (life.spoilTicks() <= 0) return;
         stack.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
     }
+
+    /**
+     * 烹饪打标（饥荒「Cooking refreshes spoilage」）：产物的腐坏量为原料的一半。
+     *
+     * <p>原料 fraction f → 产物 fraction = 1 - (1-f)/2（80% 的新鲜马铃薯
+     * 烤成烤马铃薯后 90% 新鲜）。原料无 stamp（如非食物/首次获得）→ 产物全新。
+     * 产物自身按其类型保质期解析（烤制前后保质期不同：如生鱼 3 → 熟鱼 6 天）。
+     */
+    public static void stampCooked(ItemStack result, ItemStack input, long now) {
+        if (result.isEmpty() || result.has(BiteComponents.FRESHNESS)) return;
+        ShelfLife resultLife = result.get(BiteComponents.SHELF_LIFE);
+        if (resultLife == null) {
+            resultLife = new ShelfLife(ShelfLifeRegistry.resolveShelfLifeTicks(result.getItem()));
+        }
+        if (resultLife.spoilTicks() <= 0) return;
+
+        FreshnessStamp inputStamp = input.get(BiteComponents.FRESHNESS);
+        ShelfLife inputLife = input.get(BiteComponents.SHELF_LIFE);
+        long age;
+        if (inputStamp != null && inputLife != null && inputLife.spoilTicks() > 0) {
+            long inputAge = now - inputStamp.creationGameTick();
+            long inputLifeTicks = inputLife.spoilTicks();
+            // 产物腐坏量 = 原料腐坏量的一半，按产物自身保质期换算
+            age = Math.round((inputAge / (double) inputLifeTicks) / 2.0 * resultLife.spoilTicks());
+        } else {
+            age = 0;
+        }
+        result.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - age));
+    }
 }
