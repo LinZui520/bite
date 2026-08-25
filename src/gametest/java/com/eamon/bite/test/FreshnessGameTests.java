@@ -807,4 +807,44 @@ public class FreshnessGameTests {
         // build 通过 + 无 crash 即证明 mixin 生效；产物继承语义已由第一段覆盖）
         helper.succeed();
     }
+
+    /**
+     * 地面掉落物打标（v1.0.3）：懒扫描覆盖 ItemEntity ——
+     * 已加载区块里躺在地上的食物被首见打标开始计时；
+     * 彻底变质的地面食物会被转换成腐烂物。
+     */
+    @GameTest(maxTicks = 200)
+    public void groundItemsGetStampedAndConverted(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = BiteMod.gameTime(level);
+        FreshnessClock.update(now);
+        long life = 24000L * 100;
+
+        var freshEntity = helper.spawnItem(Items.BREAD, new BlockPos(1, 2, 1));
+        var spoiledEntity = helper.spawnItem(Items.BREAD, new BlockPos(1, 2, 2));
+        spoiledEntity.getItem().setCount(2);
+        spoiledEntity.getItem().set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        spoiledEntity.getItem().set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1));
+        // spawnItem 的实体自带全新单个 stack；改写成 2 个的变质状态
+
+        int interval = ServerConfig.get().scanIntervalTicks();
+        helper.startSequence()
+            .thenExecuteAfter(interval + 40, () -> {
+                ItemStack ground = freshEntity.getItem();
+                if (!ground.has(BiteComponents.FRESHNESS)) {
+                    helper.fail("地面新鲜面包应被懒扫描打标");
+                    return;
+                }
+                ItemStack converted = spoiledEntity.getItem();
+                if (!converted.is(com.eamon.bite.item.BiteItems.ROTTEN_ORGANIC)) {
+                    helper.fail("地面变质面包应转换为腐烂物，实际是 " + converted);
+                    return;
+                }
+                if (converted.getCount() != 2) {
+                    helper.fail("地面转换应数量守恒（2 个），实际 " + converted.getCount());
+                    return;
+                }
+            })
+            .thenSucceed();
+    }
 }

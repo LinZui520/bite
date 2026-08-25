@@ -56,9 +56,17 @@ public final class FreshnessScanner {
             }
         });
         // (c) 容器实体（如箱子矿车/漏斗矿车等原版容器实体，及其他 mod 的容器实体）
+        // (d) 地面掉落物（ItemEntity）—— 已加载区块里躺在地上的食物同样首见打标
         for (var entity : level.getAllEntities()) {
             if (entity instanceof Container container) {
                 scanContainer(container, now);
+            } else if (entity instanceof net.minecraft.world.entity.item.ItemEntity itemEntity) {
+                ItemStack ground = itemEntity.getItem();
+                FreshnessStamper.stamp(ground, now);
+                ItemStack converted = spoiledResult(ground, now);
+                if (converted != null) {
+                    itemEntity.setItem(converted);
+                }
             }
         }
     }
@@ -81,20 +89,27 @@ public final class FreshnessScanner {
     private static void convertIfSpoiled(Container container, int slot, ItemStack stack, long now) {
         ServerConfig cfg = ServerConfig.get();
         if (!cfg.spoiledConversion()) return;
+        ItemStack converted = spoiledResult(stack, now);
+        if (converted != null) {
+            container.setItem(slot, converted);
+        }
+    }
+
+    /** 计算变质产物；未变质/不适用返回 null。 */
+    private static ItemStack spoiledResult(ItemStack stack, long now) {
         FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
-        if (stamp == null) return;
+        if (stamp == null) return null;
         ShelfLife life = stack.get(BiteComponents.SHELF_LIFE);
-        if (life == null || life.spoilTicks() <= 0) return;
-        if (FreshnessMath.fraction(now, stamp, life) > 0.0) return;
+        if (life == null || life.spoilTicks() <= 0) return null;
+        if (FreshnessMath.fraction(now, stamp, life) > 0.0) return null;
 
-        Identifier resultId = Identifier.tryParse(cfg.spoiledResult());
-        if (resultId == null) return; // 配置了非法 id 字符串 → 保守跳过
+        Identifier resultId = Identifier.tryParse(ServerConfig.get().spoiledResult());
+        if (resultId == null) return null; // 配置了非法 id 字符串 → 保守跳过
         var resultHolder = BuiltInRegistries.ITEM.get(resultId);
-        if (resultHolder.isEmpty()) return; // 配置了无效 id → 保守跳过
+        if (resultHolder.isEmpty()) return null; // 配置了无效 id → 保守跳过
         Item result = resultHolder.get().value();
-        if (result == Items.AIR) return;
+        if (result == Items.AIR) return null;
 
-        ItemStack converted = new ItemStack(result, stack.getCount());
-        container.setItem(slot, converted);
+        return new ItemStack(result, stack.getCount());
     }
 }
