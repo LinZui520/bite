@@ -809,6 +809,62 @@ public class FreshnessGameTests {
     }
 
     /**
+     * 合成继承新鲜度（v1.0.7，饥荒锅料理语义）：
+     * 产物腐坏量 = 全部食物原料平均腐坏量的一半。
+     *
+     * <p>用例：面包配方 3 小麦 —— 2 个全新（fraction 1.0）+ 1 个半腐（0.5），
+     * 平均腐坏量 = (0+0+0.5)/3 = 1/6，减半 = 1/12 → 产物 fraction ≈ 0.917。
+     */
+    @GameTest
+    public void craftingInheritsAverageSpoilage(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        long now = BiteMod.gameTime(level);
+        FreshnessClock.update(now);
+        long wheatLife = 24000L * 40; // 种子/谷物参照长寿命
+
+        java.util.List<ItemStack> ingredients = new java.util.ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            ItemStack fresh = new ItemStack(Items.WHEAT);
+            fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(wheatLife));
+            fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+            ingredients.add(fresh);
+        }
+        ItemStack half = new ItemStack(Items.WHEAT);
+        half.set(BiteComponents.SHELF_LIFE, new ShelfLife(wheatLife));
+        half.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - wheatLife / 2)); // fraction 0.5
+        ingredients.add(half);
+
+        ItemStack bread = new ItemStack(Items.BREAD);
+        bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(24000L * 15)); // 面包 15 天
+        com.eamon.bite.freshness.FreshnessStamper.stampCrafted(bread, ingredients, now);
+
+        FreshnessStamp stamp = bread.get(BiteComponents.FRESHNESS);
+        if (stamp == null) {
+            helper.fail("stampCrafted 应给面包打标");
+            return;
+        }
+        double actual = FreshnessMath.fraction(now, stamp, new ShelfLife(24000L * 15));
+        // 平均腐坏 (0+0+0.5)/3 = 1/6；减半 = 1/12 → fraction 11/12 ≈ 0.9167
+        if (Math.abs(actual - 11.0 / 12.0) > 0.01) {
+            helper.fail("合成应继承平均腐坏减半：期望 fraction " + (11.0 / 12.0)
+                + "，实际 " + actual);
+            return;
+        }
+
+        // 边界：全非食物原料（无 stamp）→ 产物全新
+        ItemStack allFreshBread = new ItemStack(Items.BREAD);
+        allFreshBread.set(BiteComponents.SHELF_LIFE, new ShelfLife(24000L * 15));
+        com.eamon.bite.freshness.FreshnessStamper.stampCrafted(allFreshBread,
+            java.util.List.of(new ItemStack(Items.STICK)), now);
+        FreshnessStamp freshStamp = allFreshBread.get(BiteComponents.FRESHNESS);
+        if (freshStamp == null || freshStamp.creationGameTick() != now) {
+            helper.fail("全无标原料 → 产物应全新打标（stamp=now）");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
      * 地面掉落物打标（v1.0.3）：懒扫描覆盖 ItemEntity ——
      * 已加载区块里躺在地上的食物被首见打标开始计时；
      * 彻底变质的地面食物会被转换成腐烂物。

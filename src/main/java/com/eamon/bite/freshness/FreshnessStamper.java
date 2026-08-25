@@ -43,6 +43,23 @@ public final class FreshnessStamper {
      * 产物自身按其类型保质期解析（烤制前后保质期不同：如生鱼 3 → 熟鱼 6 天）。
      */
     public static void stampCooked(ItemStack result, ItemStack input, long now) {
+        stampCrafted(result, java.util.List.of(input), now);
+    }
+
+    /**
+     * 合成/烹饪打标（饥荒锅料理语义，v1.0.7）：
+     * 产物腐坏量 = 全部「已打标食物原料」平均腐坏量的一半。
+     *
+     * <p>多原料按各自保质期归一化为腐坏比例后取平均（食物类原料才参与；
+     * 非食物/无标原料不计入分母），再减半映射到产物自身保质期。
+     * 例：3 小麦（2 全新 + 1 半腐）做面包 → 平均腐坏 1/6 → 减半 1/12 →
+     * 面包 fraction ≈ 0.917。
+     *
+     * @param result      产物（未打标且自身可腐坏时才写入）
+     * @param ingredients 合成格/炉输入的全部原料（空槽与非食物自动忽略）
+     * @param now         当前游戏刻
+     */
+    public static void stampCrafted(ItemStack result, java.util.List<ItemStack> ingredients, long now) {
         if (result.isEmpty() || result.has(BiteComponents.FRESHNESS)) return;
         ShelfLife resultLife = result.get(BiteComponents.SHELF_LIFE);
         if (resultLife == null) {
@@ -50,17 +67,20 @@ public final class FreshnessStamper {
         }
         if (resultLife.spoilTicks() <= 0) return;
 
-        FreshnessStamp inputStamp = input.get(BiteComponents.FRESHNESS);
-        ShelfLife inputLife = input.get(BiteComponents.SHELF_LIFE);
-        long age;
-        if (inputStamp != null && inputLife != null && inputLife.spoilTicks() > 0) {
-            long inputAge = now - inputStamp.creationGameTick();
-            long inputLifeTicks = inputLife.spoilTicks();
-            // 产物腐坏量 = 原料腐坏量的一半，按产物自身保质期换算
-            age = Math.round((inputAge / (double) inputLifeTicks) / 2.0 * resultLife.spoilTicks());
-        } else {
-            age = 0;
+        double spoilSum = 0.0;
+        int counted = 0;
+        for (ItemStack ingredient : ingredients) {
+            if (ingredient == null || ingredient.isEmpty()) continue;
+            FreshnessStamp stamp = ingredient.get(BiteComponents.FRESHNESS);
+            ShelfLife life = ingredient.get(BiteComponents.SHELF_LIFE);
+            if (stamp == null || life == null || life.spoilTicks() <= 0) continue;
+            double ingredientSpoil = 1.0 - FreshnessMath.fraction(now, stamp, life);
+            spoilSum += ingredientSpoil;
+            counted++;
         }
+
+        long age = counted == 0 ? 0
+            : Math.round(spoilSum / counted / 2.0 * resultLife.spoilTicks());
         result.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - age));
     }
 }

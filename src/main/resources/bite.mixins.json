@@ -11,7 +11,8 @@
     "SimpleContainerMixin",
     "AbstractContainerMenuMixin",
     "HopperBlockEntityMixin",
-    "AbstractFurnaceBlockEntityMixin"
+    "AbstractFurnaceBlockEntityMixin",
+    "ResultSlotMixin"
   ],
   "injectors": {
     "defaultRequire": 1
