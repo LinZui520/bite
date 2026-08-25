@@ -39,9 +39,33 @@ class ServerConfigTest {
         ServerConfig cfg = ServerConfig.fromJson("{}");
         assertTrue(cfg.enabled());
         assertEquals(100, cfg.scanIntervalTicks());
-        assertEquals(6, cfg.shelfLifeDays().get("bread"));
+        // 饥荒化默认表（DST 参照）：面包 15（料理档）、生肉 6、生鱼 3
+        assertEquals(15, cfg.shelfLifeDays().get("bread"));
+        assertEquals(6, cfg.shelfLifeDays().get("raw_meat"));
+        assertEquals(3, cfg.shelfLifeDays().get("raw_fish"));
         assertTrue(cfg.itemOverrides().containsKey("minecraft:golden_apple"));
         assertEquals(0.75, cfg.nutritionScaleStale());
+        // 饥荒档位阈值：陈旧档 0-20%
+        assertEquals(0.2, cfg.oldThreshold());
+    }
+
+    @Test
+    void dontStarveOverridesTable() {
+        Map<String, Integer> ov = ServerConfig.DEFAULT.itemOverrides();
+        // 浆果 6 天（饥荒浆果；MC 无烤浆果物品故无「烤更快」项）
+        assertEquals(6, ov.get("minecraft:sweet_berries"));
+        assertEquals(6, ov.get("minecraft:glow_berries"));
+        // 烤马铃薯坏得比生马铃薯快（饥荒：10 → 6，熟加工≠更耐放的反直觉档）
+        assertEquals(6, ov.get("minecraft:baked_potato"));
+        // 熟鱼 6 天（饥荒：鱼 3 → 熟鱼 6，鱼类熟反而更耐放）
+        assertEquals(6, ov.get("minecraft:cooked_cod"));
+        assertEquals(6, ov.get("minecraft:cooked_salmon"));
+        // 种子类 40 天（比照饥荒种子）
+        assertEquals(40, ov.get("minecraft:wheat_seeds"));
+        assertEquals(40, ov.get("minecraft:pumpkin_seeds"));
+        // 蜂蜜 40（饥荒里蜂蜜也会坏）
+        assertEquals(40, ov.get("minecraft:honey_bottle"));
+        assertEquals(40, ov.get("minecraft:honeycomb"));
     }
 
     @Test

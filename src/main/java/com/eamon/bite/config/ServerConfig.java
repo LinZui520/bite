@@ -34,21 +34,42 @@ public record ServerConfig(
     public static ServerConfig get() { return instance; }
 
     private static ServerConfig createDefault() {
+        // 饥荒（DST）保鲜天数直搬：分类默认 + 逐物品 overrides（见 spec v1.0.2）
         Map<String, Integer> shelf = new LinkedHashMap<>();
-        shelf.put("raw_meat", 2); shelf.put("raw_fish", 2);
-        shelf.put("cooked_meat", 4); shelf.put("cooked_fish", 4);
-        shelf.put("bread", 6); shelf.put("vegetable", 6); shelf.put("fruit", 6);
-        shelf.put("berry", 6); shelf.put("dough", 6);
-        shelf.put("soup", 3); shelf.put("cookie", 3); shelf.put("pie", 3); shelf.put("candy", 3);
-        shelf.put("default", 7);
+        shelf.put("raw_meat", 6); shelf.put("raw_fish", 3);
+        shelf.put("cooked_meat", 10); shelf.put("cooked_fish", 6);
+        shelf.put("vegetable", 10); shelf.put("fruit", 6);
+        shelf.put("berry", 6); shelf.put("dough", 10);
+        shelf.put("bread", 15); shelf.put("cookie", 15); shelf.put("pie", 15); shelf.put("candy", 15);
+        shelf.put("soup", 6);
+        shelf.put("default", 15); // 料理档（DST 大多菜肴 10-20 天）
         Map<String, Integer> overrides = new TreeMap<>();
+        // 豁免（永不腐坏）
         overrides.put("minecraft:golden_apple", -1);
         overrides.put("minecraft:enchanted_golden_apple", -1);
         overrides.put("minecraft:rotten_flesh", -1);
         overrides.put("minecraft:spider_eye", -1);
         overrides.put("minecraft:poisonous_potato", -1);
+        // 烤制浆果坏得快（饥荒：浆果 6 → 烤浆果 3）
+        overrides.put("minecraft:sweet_berries", 6);
+        overrides.put("minecraft:glow_berries", 6);
+        // 烤马铃薯 6（饥荒：马铃薯 10 → 烤 6）
+        overrides.put("minecraft:baked_potato", 6);
+        // 熟鱼 6（饥荒：鱼 3 → 熟鱼 6，熟反而更耐放）
+        overrides.put("minecraft:cooked_cod", 6);
+        overrides.put("minecraft:cooked_salmon", 6);
+        // 种子类 40 天（饥荒种子）
+        overrides.put("minecraft:wheat_seeds", 40);
+        overrides.put("minecraft:pumpkin_seeds", 40);
+        overrides.put("minecraft:melon_seeds", 40);
+        overrides.put("minecraft:beetroot_seeds", 40);
+        overrides.put("minecraft:torchflower_seeds", 40);
+        overrides.put("minecraft:pitcher_seeds", 40);
+        // 蜂蜜 40 天（饥荒里蜂蜜也会坏）
+        overrides.put("minecraft:honey_bottle", 40);
+        overrides.put("minecraft:honeycomb", 40);
         return new ServerConfig(true, 100, shelf, overrides,
-            0.5, 0.25, 0.75, 0.5, 0.3, 160, true,
+            0.5, 0.2, 0.75, 0.5, 0.3, 160, true,
             true, "bite:rotten_organic");
     }
 
