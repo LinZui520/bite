@@ -576,4 +576,56 @@ public class FreshnessGameTests {
 
         helper.succeed();
     }
+
+    /**
+     * BUG 复现 1（诊断）：DefaultItemComponentEvents 注入的默认 bite:shelf_life
+     * 在真实物品上是否生效。此前的测试全部显式 set 组件，从未验证默认路径。
+     */
+    @GameTest
+    public void defaultShelfLifeIsInjected(GameTestHelper helper) {
+        ItemStack bread = new ItemStack(Items.BREAD);
+        ShelfLife life = bread.get(BiteComponents.SHELF_LIFE);
+        if (life == null) {
+            helper.fail("默认组件未生效：new ItemStack(BREAD) 上没有 bite:shelf_life");
+            return;
+        }
+        if (life.spoilTicks() <= 0) {
+            helper.fail("默认 shelf_life 值异常: " + life.spoilTicks());
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * BUG 复现 2（诊断）：模拟用户报告的场景 —— 背包里有一块「已打标」食物
+     * （懒扫描已处理），拾取一块「从未打标」的同类食物（地上非 loot 来源掉落物，
+     * ItemEntity 不是 Container，懒扫描扫不到，永远无 FRESHNESS）。
+     * 走真实 Inventory.add 入口。期望（正确行为）合并为 1 堆。
+     */
+    @GameTest
+    public void pickupOfUnstampedFoodMergesWithStamped(GameTestHelper helper) {
+        FreshnessClock.update(helper.getLevel().getGameTime());
+        var player = helper.makeMockPlayer(GameType.SURVIVAL);
+
+        // 背包里的：已被懒扫描打标（stamp + life）
+        ItemStack stamped = new ItemStack(Items.BREAD);
+        stamped.set(BiteComponents.SHELF_LIFE, new ShelfLife(24000L * 6));
+        stamped.set(BiteComponents.FRESHNESS, new FreshnessStamp(FreshnessClock.now()));
+        player.getInventory().add(stamped);
+
+        // 「拾取」的：地上掉落物状态（无 FRESHNESS；SHELF_LIFE 来自默认组件）
+        ItemStack unstamped = new ItemStack(Items.BREAD);
+        player.getInventory().add(unstamped);
+
+        int breadStacks = 0;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            if (player.getInventory().getItem(i).is(Items.BREAD)) breadStacks++;
+        }
+        if (breadStacks != 1) {
+            helper.fail("复现：无标掉落物拾取后未与背包已标食物合并，背包里有 "
+                + breadStacks + " 堆面包（期望 1 堆）");
+            return;
+        }
+        helper.succeed();
+    }
 }
