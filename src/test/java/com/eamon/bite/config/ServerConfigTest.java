@@ -63,9 +63,9 @@ class ServerConfigTest {
         // 种子类 40 天（比照饥荒种子）
         assertEquals(40, ov.get("minecraft:wheat_seeds"));
         assertEquals(40, ov.get("minecraft:pumpkin_seeds"));
-        // 蜂蜜 40（饥荒里蜂蜜也会坏）
-        assertEquals(40, ov.get("minecraft:honey_bottle"));
-        assertEquals(40, ov.get("minecraft:honeycomb"));
+        // 蜂蜜永不腐坏（v1.0.5 用户口径，对齐现实蜂蜜）
+        assertEquals(-1, ov.get("minecraft:honey_bottle"));
+        assertEquals(-1, ov.get("minecraft:honeycomb"));
     }
 
     @Test
