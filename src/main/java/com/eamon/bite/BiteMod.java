@@ -10,6 +10,7 @@ import com.eamon.bite.freshness.FreshnessMath;
 import com.eamon.bite.freshness.FreshnessScanner;
 import com.eamon.bite.freshness.FreshnessStamper;
 import com.eamon.bite.freshness.ShelfLifeRegistry;
+import com.eamon.bite.item.BiteItems;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
@@ -34,6 +35,7 @@ public class BiteMod implements ModInitializer {
         ServerConfig.load(FabricLoader.getInstance().getConfigDir());
         BiteComponents.FRESHNESS.getClass(); // 触发静态注册
         registerDefaultShelfLife();
+        BiteItems.ROTTEN_ORGANIC.getClass(); // 触发物品静态注册
         registerLootDropStamping();
         registerLazyScan();
         registerSpoiledFoodBlock();

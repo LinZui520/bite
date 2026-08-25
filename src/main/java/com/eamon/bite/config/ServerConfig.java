@@ -23,7 +23,9 @@ public record ServerConfig(
     double nutritionScaleOld,
     double hungerEffectChance,
     int hungerEffectDurationTicks,
-    boolean spoiledInedible
+    boolean spoiledInedible,
+    boolean spoiledConversion,
+    String spoiledResult
 ) {
     public static final ServerConfig DEFAULT = createDefault();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
@@ -46,7 +48,8 @@ public record ServerConfig(
         overrides.put("minecraft:spider_eye", -1);
         overrides.put("minecraft:poisonous_potato", -1);
         return new ServerConfig(true, 100, shelf, overrides,
-            0.5, 0.25, 0.75, 0.5, 0.3, 160, true);
+            0.5, 0.25, 0.75, 0.5, 0.3, 160, true,
+            true, "bite:rotten_organic");
     }
 
     public static ServerConfig fromJson(String json) {
@@ -72,12 +75,15 @@ public record ServerConfig(
             orDefault(raw.nutrition_scale_old, d.nutritionScaleOld),
             orDefault(raw.hunger_effect_chance, d.hungerEffectChance),
             orDefault(raw.hunger_effect_duration_ticks, d.hungerEffectDurationTicks),
-            orDefault(raw.spoiled_inedible, d.spoiledInedible));
+            orDefault(raw.spoiled_inedible, d.spoiledInedible),
+            orDefault(raw.spoiled_conversion, d.spoiledConversion),
+            orDefault(raw.spoiled_result, d.spoiledResult));
     }
 
     private static int orDefault(Integer v, int d) { return v == null ? d : v; }
     private static double orDefault(Double v, double d) { return v == null ? d : v; }
     private static boolean orDefault(Boolean v, boolean d) { return v == null ? d : v; }
+    private static String orDefault(String v, String d) { return v == null ? d : v; }
 
     public String toJson() {
         Raw raw = new Raw();
@@ -87,6 +93,7 @@ public record ServerConfig(
         raw.nutrition_scale_stale = nutritionScaleStale; raw.nutrition_scale_old = nutritionScaleOld;
         raw.hunger_effect_chance = hungerEffectChance; raw.hunger_effect_duration_ticks = hungerEffectDurationTicks;
         raw.spoiled_inedible = spoiledInedible;
+        raw.spoiled_conversion = spoiledConversion; raw.spoiled_result = spoiledResult;
         return GSON.toJson(raw);
     }
 
@@ -121,5 +128,7 @@ public record ServerConfig(
         Double hunger_effect_chance;
         Integer hunger_effect_duration_ticks;
         Boolean spoiled_inedible;
+        Boolean spoiled_conversion;
+        String spoiled_result;
     }
 }

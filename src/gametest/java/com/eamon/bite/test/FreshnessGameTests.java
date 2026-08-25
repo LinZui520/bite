@@ -709,4 +709,61 @@ public class FreshnessGameTests {
         }
         helper.succeed();
     }
+
+    /**
+     * 变质转换（v1.0.1）：变质食物（fraction ≤ 0）在懒扫描周期后
+     * 整堆替换为腐烂物，数量守恒；未变质食物不被转换。
+     *
+     * <p>保质期用 100 游戏天隔离 gametest 骨架的快进漂移（同 hopper 测试）：
+     * 「变质」那一堆直接把 stamp 构造在保质期之外，与快进量无关。
+     */
+    @GameTest(maxTicks = 200)
+    public void spoiledFoodConvertsToRottenOrganic(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.CHEST);
+        ChestBlockEntity chest = helper.getBlockEntity(new BlockPos(1, 1, 1), ChestBlockEntity.class);
+        if (chest == null) {
+            helper.fail("chest block entity not created");
+            return;
+        }
+        long now = BiteMod.gameTime(level);
+        FreshnessClock.update(now);
+        long life = 24000L * 100;
+
+        // 变质堆：stamp 早于保质期起点 → fraction = 0（3 块）
+        ItemStack spoiled = new ItemStack(Items.BREAD, 3);
+        spoiled.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1));
+        chest.setItem(0, spoiled);
+
+        // 新鲜堆：fraction = 1（2 块）
+        ItemStack fresh = new ItemStack(Items.BREAD, 2);
+        fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
+        fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
+        chest.setItem(1, fresh);
+
+        int interval = ServerConfig.get().scanIntervalTicks();
+        helper.startSequence()
+            .thenExecuteAfter(interval + 40, () -> {
+                ItemStack slot0 = chest.getItem(0);
+                if (!slot0.is(com.eamon.bite.item.BiteItems.ROTTEN_ORGANIC)) {
+                    helper.fail("变质堆应转换为腐烂物，实际是 " + slot0);
+                    return;
+                }
+                if (slot0.getCount() != 3) {
+                    helper.fail("转换应数量守恒：期望 3 个腐烂物，实际 " + slot0.getCount());
+                    return;
+                }
+                if (slot0.has(BiteComponents.FRESHNESS)) {
+                    helper.fail("腐烂物不应有 FRESHNESS 组件（永不腐坏）");
+                    return;
+                }
+                ItemStack slot1 = chest.getItem(1);
+                if (!slot1.is(Items.BREAD) || slot1.getCount() != 2) {
+                    helper.fail("新鲜面包不应被转换，实际是 " + slot1);
+                    return;
+                }
+            })
+            .thenSucceed();
+    }
 }

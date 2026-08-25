@@ -12,5 +12,6 @@
   "bite.cmd.freshness.never": "Never spoils",
   "modmenu.nameTranslation.bite": "Because It's Too Easy",
   "modmenu.summaryTranslation.bite": "Food spoilage survival mechanics",
-  "modmenu.descriptionTranslation.bite": "Food spoils over time, merges by weighted-average freshness, and stale meals bite back. Survival was too easy."
+  "modmenu.descriptionTranslation.bite": "Food spoils over time, merges by weighted-average freshness, and stale meals bite back. Survival was too easy.",
+  "item.bite.rotten_organic": "Rotten Organic"
 }

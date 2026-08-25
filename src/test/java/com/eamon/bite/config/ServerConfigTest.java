@@ -72,4 +72,29 @@ class ServerConfigTest {
         assertEquals(1, cfg.scanIntervalTicks(),
             "scan_interval_ticks=0 must clamp to 1 to avoid ArithmeticException in modulo gate");
     }
+
+    @Test
+    void spoiledConversionDefaults() {
+        assertTrue(ServerConfig.DEFAULT.spoiledConversion(),
+            "变质转换默认开启");
+        assertEquals("bite:rotten_organic", ServerConfig.DEFAULT.spoiledResult(),
+            "默认转换产物是 bite:rotten_organic");
+    }
+
+    @Test
+    void spoiledConversionParses() {
+        String json = """
+            {
+              "spoiled_conversion": false,
+              "spoiled_result": "minecraft:rotten_flesh"
+            }
+            """;
+        ServerConfig cfg = ServerConfig.fromJson(json);
+        assertFalse(cfg.spoiledConversion());
+        assertEquals("minecraft:rotten_flesh", cfg.spoiledResult());
+        // 缺省回退
+        ServerConfig empty = ServerConfig.fromJson("{}");
+        assertTrue(empty.spoiledConversion());
+        assertEquals("bite:rotten_organic", empty.spoiledResult());
+    }
 }
