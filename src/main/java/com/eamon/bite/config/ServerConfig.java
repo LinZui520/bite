@@ -75,7 +75,7 @@ public record ServerConfig(
         // 蜂蜜永不腐坏（v1.0.5 用户口径，对齐现实蜂蜜；蜜脾同）
         overrides.put("minecraft:honey_bottle", -1);
         overrides.put("minecraft:honeycomb", -1);
-        return new ServerConfig(true, 100, shelf, overrides,
+        return new ServerConfig(true, 20, shelf, overrides,
             0.5, 0.2, 0.75, 0.5, 0.3, 160, true,
             true, "bite:rotten_organic");
     }

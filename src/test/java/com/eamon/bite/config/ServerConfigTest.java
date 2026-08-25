@@ -38,7 +38,7 @@ class ServerConfigTest {
     void missingFieldsFallBackToDefaults() {
         ServerConfig cfg = ServerConfig.fromJson("{}");
         assertTrue(cfg.enabled());
-        assertEquals(100, cfg.scanIntervalTicks());
+        assertEquals(20, cfg.scanIntervalTicks());
         // 饥荒化默认表（DST 参照）：面包 15（料理档）、生肉 6、生鱼 3
         assertEquals(15, cfg.shelfLifeDays().get("bread"));
         assertEquals(6, cfg.shelfLifeDays().get("raw_meat"));
