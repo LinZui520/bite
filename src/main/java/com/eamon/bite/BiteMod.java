@@ -39,8 +39,24 @@ public class BiteMod implements ModInitializer {
         registerSpoiledFoodBlock();
         BiteCommands.register();
         ServerTickEvents.END_SERVER_TICK.register(server ->
-            FreshnessClock.update(server.overworld().getGameTime()));
+            FreshnessClock.update(gameTime(server.overworld())));
         LOGGER.info("Because It's Too Easy initialized");
+    }
+
+    /**
+     * 统一的游戏时钟读取口（26.2 WorldClock 体系）。
+     *
+     * <p>26.2 把玩家可感知、可操作的时间迁入 {@code WorldClock}（ServerClockManager，
+     * {@code /time add|set} 操作它，支持 rate/paused），而 {@code level.getGameTime()}
+     * 只随真实运行 tick 递增、不受 /time 命令影响 —— 两者是独立计数器。
+     * 新鲜度语义（spec §5「食物随游戏时间腐坏」）应绑定 WorldClock：
+     * overworld 时钟随真实时间走、随 /time 跳变、随变速/暂停同步。
+     *
+     * @param level 任意维度（读取全局 overworld 时钟）
+     * @return overworld WorldClock 的 totalTicks
+     */
+    public static long gameTime(Level level) {
+        return level.getOverworldClockTime();
     }
 
     /**
@@ -75,7 +91,7 @@ public class BiteMod implements ModInitializer {
      */
     private static void registerLootDropStamping() {
         LootTableEvents.MODIFY_DROPS.register((tableHolder, context, drops) -> {
-            long now = context.getLevel().getGameTime();
+            long now = gameTime(context.getLevel());
             for (ItemStack drop : drops) {
                 FreshnessStamper.stamp(drop, now);
             }
@@ -94,7 +110,7 @@ public class BiteMod implements ModInitializer {
             if (!cfg.enabled()) return;
             if (cfg.scanIntervalTicks() <= 0) return;
             if (level.getGameTime() % cfg.scanIntervalTicks() != 0) return;
-            FreshnessScanner.scanLevel(level, level.getGameTime());
+            FreshnessScanner.scanLevel(level, gameTime(level));
         });
     }
 
@@ -124,7 +140,7 @@ public class BiteMod implements ModInitializer {
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (!ServerConfig.get().spoiledInedible()) return InteractionResult.PASS;
             ItemStack stack = player.getItemInHand(hand);
-            if (!isSpoiledInedible(stack, level.getGameTime())) return InteractionResult.PASS;
+            if (!isSpoiledInedible(stack, gameTime(level))) return InteractionResult.PASS;
             if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
                 serverPlayer.sendOverlayMessage(Component.translatable("bite.msg.spoiled_inedible"));
             }

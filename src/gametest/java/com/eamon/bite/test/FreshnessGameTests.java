@@ -7,6 +7,7 @@ import com.eamon.bite.BiteMod;
 import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.freshness.FreshnessMath;
+import com.eamon.bite.freshness.FreshnessStamper;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -70,7 +71,7 @@ public class FreshnessGameTests {
             return;
         }
 
-        long now = level.getGameTime();
+        long now = BiteMod.gameTime(level);
         for (ItemStack drop : drops) {
             FreshnessStamp stamp = drop.get(BiteComponents.FRESHNESS);
             if (stamp == null) {
@@ -78,7 +79,7 @@ public class FreshnessGameTests {
                 return;
             }
             if (stamp.creationGameTick() != now) {
-                helper.fail("stamp tick " + stamp.creationGameTick() + " != game time " + now);
+                helper.fail("stamp tick " + stamp.creationGameTick() + " != game clock " + now);
                 return;
             }
         }
@@ -135,7 +136,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void relaxedEqualityMergesDifferentStamps(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L; // bread 默认 6 天
         long staleAge = (long) (0.8 * shelfLifeTicks); // 80% 已过 → fraction 0.2
@@ -168,7 +169,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void relaxedEqualityDoesNotMergeDifferentItems(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L;
 
@@ -214,7 +215,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void mergeIsWeightedAverage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6; // bread 6 days
 
@@ -277,13 +278,17 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 80)
     public void hopperMergeIsWeightedAverage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
-        long life = 24000L * 6;
+        // 用远大于面包默认值的保质期：gametest 骨架在 thenExecuteAfter 等待期间
+        // 会把世界快进数万至数十万 tick（实测一轮 7 游戏天，量级不稳定），
+        // 保质期 100 游戏天保证两侧面包在断言前都未腐坏。
+        // 新鲜度语义只关心相对比例，保质期绝对值不影响被测逻辑。
+        long life = 24000L * 100;
 
         ItemStack stale = new ItemStack(Items.BREAD, 1);
         stale.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
-        stale.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.9)));
+        stale.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.5)));
 
         ItemStack fresh = new ItemStack(Items.BREAD, 1);
         fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
@@ -313,7 +318,16 @@ public class FreshnessGameTests {
                 }
                 ItemStack merged = hopper.getItem(0);
                 if (merged.getCount() != 2) {
-                    helper.fail("expected hopper slot 0 count 2 (stale+fresh), got " + merged.getCount());
+                    // 诊断：失败时刻的真实时钟与两块面包当前组件状态
+                    FreshnessStamp diagStamp = merged.get(BiteComponents.FRESHNESS);
+                    FreshnessStamp chest0 = chest.getItem(0) == null ? null : chest.getItem(0).get(BiteComponents.FRESHNESS);
+                    FreshnessStamp chest1 = chest.getItem(1) == null ? null : chest.getItem(1).get(BiteComponents.FRESHNESS);
+                    helper.fail("expected hopper slot 0 count 2, got " + merged.getCount()
+                        + " | clock=" + FreshnessClock.now()
+                        + " | hopperStamp=" + (diagStamp == null ? "null" : diagStamp.creationGameTick())
+                        + " | chest0=" + (chest0 == null ? "empty" : chest0.creationGameTick())
+                        + " | chest1=" + (chest1 == null ? "empty" : chest1.creationGameTick())
+                        + " | madeNow=" + now);
                     return;
                 }
                 FreshnessStamp stamp = merged.get(BiteComponents.FRESHNESS);
@@ -341,7 +355,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void relaxedEqualityDoesNotMergeSpoiled(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L;
         long spoiledAge = shelfLifeTicks + 1L; // 完全过期 → fraction 0
@@ -398,7 +412,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void staleFoodGivesReducedNutrition(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6; // bread 默认 6 天
 
@@ -436,7 +450,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void freshFoodGivesFullNutrition(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6;
 
@@ -479,7 +493,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void staleFoodAtFoodCapStillScalesSaturation(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6;
 
@@ -536,7 +550,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void spoiledInedibleDecision(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(level.getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6; // bread 6 days
 
@@ -604,7 +618,7 @@ public class FreshnessGameTests {
      */
     @GameTest
     public void pickupOfUnstampedFoodMergesWithStamped(GameTestHelper helper) {
-        FreshnessClock.update(helper.getLevel().getGameTime());
+        FreshnessClock.update(BiteMod.gameTime(helper.getLevel()));
         var player = helper.makeMockPlayer(GameType.SURVIVAL);
 
         // 背包里的：已被懒扫描打标（stamp + life）
@@ -624,6 +638,73 @@ public class FreshnessGameTests {
         if (breadStacks != 1) {
             helper.fail("复现：无标掉落物拾取后未与背包已标食物合并，背包里有 "
                 + breadStacks + " 堆面包（期望 1 堆）");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * BUG 复现 3（诊断，/time add 不加速腐坏的根因证据）：
+     * 26.2 时间体系重构后存在两个独立计数器 ——
+     * levelData game time（旧）与 WorldClock totalTicks（新，/time add 操作它）。
+     * 本测试用 ServerClockManager.addTicks 模拟 /time add，
+     * 断言游戏时钟读取口（BiteMod.gameTime）随之跳变。
+     * 若本测试失败而 addTicks 确实执行 → 读取口绑错计数器。
+     */
+    @GameTest
+    public void timeAddAdvancesGameClock(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        var overworldClock = helper.getLevel().registryAccess()
+            .lookupOrThrow(net.minecraft.core.registries.Registries.WORLD_CLOCK)
+            .get(Identifier.fromNamespaceAndPath("minecraft", "overworld"))
+            .orElseThrow();
+        long before = BiteMod.gameTime(helper.getLevel());
+        server.clockManager().addTicks(overworldClock, 48000); // /time add 2d
+        long after = BiteMod.gameTime(helper.getLevel());
+        if (after - before < 48000L) {
+            helper.fail("根因证据：/time add 后游戏时钟仅前进 " + (after - before)
+                + " ticks（期望 ≥ 48000）—— 时间读取口绑在错误计数器上");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * BUG 复现 4（端到端）：/time add 快进后食物新鲜度必须下降。
+     * 面包保质期 6 游戏天；打标后快进 5 天，新鲜度应从 100% 降到 ~16.7%。
+     */
+    @GameTest
+    public void timeAddSpoilsFood(GameTestHelper helper) {
+        var level = helper.getLevel();
+        FreshnessClock.update(BiteMod.gameTime(level));
+        ItemStack bread = new ItemStack(Items.BREAD);
+        bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(24000L * 6));
+        FreshnessStamper.stamp(bread, BiteMod.gameTime(level));
+        if (bread.get(BiteComponents.FRESHNESS) == null) {
+            helper.fail("前置失败：面包未被正确打标");
+            return;
+        }
+        double freshBefore = FreshnessMath.fraction(BiteMod.gameTime(level),
+            bread.get(BiteComponents.FRESHNESS), bread.get(BiteComponents.SHELF_LIFE));
+
+        level.getServer().clockManager().addTicks(
+            level.registryAccess()
+                .lookupOrThrow(net.minecraft.core.registries.Registries.WORLD_CLOCK)
+                .get(Identifier.fromNamespaceAndPath("minecraft", "overworld"))
+                .orElseThrow(),
+            24000 * 5);
+
+        double freshAfter = FreshnessMath.fraction(BiteMod.gameTime(level),
+            bread.get(BiteComponents.FRESHNESS), bread.get(BiteComponents.SHELF_LIFE));
+        if (freshAfter >= freshBefore) {
+            helper.fail(String.format(
+                "复现：/time add 5 游戏天后新鲜度未下降（before=%.3f after=%.3f）",
+                freshBefore, freshAfter));
+            return;
+        }
+        // 5/6 天过去 → ~16.7%
+        if (Math.abs(freshAfter - (1.0 - 5.0 / 6.0)) > 0.01) {
+            helper.fail("快进 5/6 保质期后新鲜度应为 ~0.167，实际 " + freshAfter);
             return;
         }
         helper.succeed();
