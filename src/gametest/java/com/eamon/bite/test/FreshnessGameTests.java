@@ -3,7 +3,6 @@ package com.eamon.bite.test;
 import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.component.ShelfLife;
-import com.eamon.bite.BiteMod;
 import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.freshness.FreshnessMath;
@@ -532,8 +531,8 @@ public class FreshnessGameTests {
      * 变质禁食判定（终审补充）：覆盖 UseItemCallback 拦截分支的唯一未覆盖 gameplay 路径。
      *
      * <p>UseItemCallback 由玩家右键交互触发，gametest 无法直接驱动玩家输入；
-     * 故测试回调所调用的<b>决策函数</b> {@link BiteMod#isSpoiledInedible}（终审抽出，
-     * 回调与测试共享同一判定）。四个断言覆盖全部分支：
+     * 故测试回调所调用的<b>决策函数</b> {@link FreshnessMath#isSpoiled}
+     * （回调与测试共享同一判定）。四个断言覆盖全部分支：
      * <ul>
      *   <li>spoiled food（FRESHNESS 早于 shelf life → fraction 0）→ <b>true</b>（阻止进食）</li>
      *   <li>fresh food（fraction 1.0）→ <b>false</b></li>
@@ -552,7 +551,7 @@ public class FreshnessGameTests {
         ItemStack spoiled = new ItemStack(Items.BREAD);
         spoiled.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
         spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1L));
-        if (!BiteMod.isSpoiledInedible(spoiled, now)) {
+        if (!FreshnessMath.isSpoiled(spoiled, now)) {
             helper.fail("spoiled food (fraction 0) should be inedible → true");
             return;
         }
@@ -561,14 +560,14 @@ public class FreshnessGameTests {
         ItemStack fresh = new ItemStack(Items.BREAD);
         fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
         fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now));
-        if (BiteMod.isSpoiledInedible(fresh, now)) {
+        if (FreshnessMath.isSpoiled(fresh, now)) {
             helper.fail("fresh food (fraction 1.0) should not be inedible → false");
             return;
         }
 
         // (3) unstamped: no FRESHNESS component
         ItemStack unstamped = new ItemStack(Items.BREAD);
-        if (BiteMod.isSpoiledInedible(unstamped, now)) {
+        if (FreshnessMath.isSpoiled(unstamped, now)) {
             helper.fail("unstamped food (no FRESHNESS) should not be inedible → false");
             return;
         }
@@ -577,7 +576,7 @@ public class FreshnessGameTests {
         ItemStack neverSpoil = new ItemStack(Items.BREAD);
         neverSpoil.set(BiteComponents.SHELF_LIFE, new ShelfLife(-1L));
         neverSpoil.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1L));
-        if (BiteMod.isSpoiledInedible(neverSpoil, now)) {
+        if (FreshnessMath.isSpoiled(neverSpoil, now)) {
             helper.fail("never-spoil food (spoilTicks <= 0) should not be inedible → false");
             return;
         }
@@ -704,14 +703,14 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 变质转换：变质食物（fraction ≤ 0）在懒扫描周期后
-     * 整堆替换为腐烂物，数量守恒；未变质食物不被转换。
+     * 变质移除：变质食物（fraction ≤ 0）在懒扫描周期后整堆消失；
+     * 未变质食物保留。
      *
      * <p>保质期用 100 游戏天隔离 gametest 骨架的快进漂移（同 hopper 测试）：
      * 「变质」那一堆直接把 stamp 构造在保质期之外，与快进量无关。
      */
     @GameTest(maxTicks = 200)
-    public void spoiledFoodConvertsToRottenOrganic(GameTestHelper helper) {
+    public void spoiledFoodVanishesAfterScan(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         helper.setBlock(new BlockPos(1, 1, 1), Blocks.CHEST);
         ChestBlockEntity chest = helper.getBlockEntity(new BlockPos(1, 1, 1), ChestBlockEntity.class);
@@ -737,22 +736,13 @@ public class FreshnessGameTests {
         int interval = ServerConfig.get().scanIntervalTicks();
         helper.startSequence()
             .thenExecuteAfter(interval + 40, () -> {
-                ItemStack slot0 = chest.getItem(0);
-                if (!slot0.is(com.eamon.bite.item.BiteItems.ROTTEN_ORGANIC)) {
-                    helper.fail("变质堆应转换为腐烂物，实际是 " + slot0);
-                    return;
-                }
-                if (slot0.getCount() != 3) {
-                    helper.fail("转换应数量守恒：期望 3 个腐烂物，实际 " + slot0.getCount());
-                    return;
-                }
-                if (slot0.has(BiteComponents.FRESHNESS)) {
-                    helper.fail("腐烂物不应有 FRESHNESS 组件（永不腐坏）");
+                if (!chest.getItem(0).isEmpty()) {
+                    helper.fail("变质堆应整堆消失，实际是 " + chest.getItem(0));
                     return;
                 }
                 ItemStack slot1 = chest.getItem(1);
                 if (!slot1.is(Items.BREAD) || slot1.getCount() != 2) {
-                    helper.fail("新鲜面包不应被转换，实际是 " + slot1);
+                    helper.fail("新鲜面包不应被移除，实际是 " + slot1);
                     return;
                 }
             })
@@ -852,20 +842,19 @@ public class FreshnessGameTests {
     /**
      * 地面掉落物打标：懒扫描覆盖 ItemEntity ——
      * 已加载区块里躺在地上的食物被首见打标开始计时；
-     * 彻底变质的地面食物会被转换成腐烂物。
+     * 彻底变质的地面掉落物被移除。
      */
     @GameTest(maxTicks = 200)
-    public void groundItemsGetStampedAndConverted(GameTestHelper helper) {
+    public void groundItemsGetStampedAndSpoiledVanish(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         long now = FreshnessClock.now(level);
         long life = 24000L * 100;
 
         var freshEntity = helper.spawnItem(Items.BREAD, new BlockPos(1, 2, 1));
         var spoiledEntity = helper.spawnItem(Items.BREAD, new BlockPos(1, 2, 2));
-        spoiledEntity.getItem().setCount(2);
+        // spawnItem 的实体自带全新单个 stack；改写成变质状态
         spoiledEntity.getItem().set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
         spoiledEntity.getItem().set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1));
-        // spawnItem 的实体自带全新单个 stack；改写成 2 个的变质状态
 
         int interval = ServerConfig.get().scanIntervalTicks();
         helper.startSequence()
@@ -875,13 +864,8 @@ public class FreshnessGameTests {
                     helper.fail("地面新鲜面包应被懒扫描打标");
                     return;
                 }
-                ItemStack converted = spoiledEntity.getItem();
-                if (!converted.is(com.eamon.bite.item.BiteItems.ROTTEN_ORGANIC)) {
-                    helper.fail("地面变质面包应转换为腐烂物，实际是 " + converted);
-                    return;
-                }
-                if (converted.getCount() != 2) {
-                    helper.fail("地面转换应数量守恒（2 个），实际 " + converted.getCount());
+                if (!spoiledEntity.isRemoved()) {
+                    helper.fail("地面变质面包应被移除");
                     return;
                 }
             })

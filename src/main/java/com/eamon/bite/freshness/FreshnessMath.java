@@ -1,7 +1,9 @@
 package com.eamon.bite.freshness;
 
+import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.component.ShelfLife;
+import net.minecraft.world.item.ItemStack;
 
 /** 新鲜度纯函数。双端共用；时间一律 game time。 */
 public final class FreshnessMath {
@@ -22,6 +24,15 @@ public final class FreshnessMath {
         double merged = (f1 * count1 + f2 * count2) / (count1 + count2);
         long age = Math.round((1.0 - merged) * life.spoilTicks());
         return new FreshnessStamp(now - age);
+    }
+
+    /** 栈级判定：是否已完全变质（fraction ≤ 0）。无戳 / 永不腐坏 → false。 */
+    public static boolean isSpoiled(ItemStack stack, long now) {
+        FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
+        if (stamp == null) return false;
+        ShelfLife life = stack.get(BiteComponents.SHELF_LIFE);
+        if (life == null || life.spoilTicks() <= 0) return false;
+        return fraction(now, stamp, life) <= 0.0;
     }
 
     /** 档位划分（渲染/调试用硬阈值；营养缩放走配置阈值，见 SpoiledFoodHandler）。 */

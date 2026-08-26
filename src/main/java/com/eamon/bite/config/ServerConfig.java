@@ -143,6 +143,8 @@ public record ServerConfig(
         Double hunger_effect_chance;
         Integer hunger_effect_duration_ticks;
         Boolean spoiled_inedible;
+        // spoiled_conversion 暂时口径：true = 扫描器移除变质食物（原 = 转换为
+        // spoiled_result；转换暂缓后该键暂未读取，保留以备恢复）
         Boolean spoiled_conversion;
         String spoiled_result;
     }

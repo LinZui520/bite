@@ -14,9 +14,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 懒扫描：按配置周期观察世界里的食物——未打标的首次被观察到时打标，
- * 已完全变质的按配置转换为产物（数量守恒）。
+ * 已完全变质的整堆移除（当前口径：直接消失；腐烂物转换暂缓，
+ * 原实现注释保留在文件底部）。
  *
  * <p>未开箱的 loot 容器（loot table 尚未生成）跳过，避免触发 loot 生成。
  */
@@ -40,17 +44,22 @@ public final class FreshnessScanner {
             }
         });
         // 容器实体（箱子矿车等）与地面掉落物不在方块实体之列，单独扫
+        boolean disposeSpoiled = ServerConfig.get().spoiledConversion();
+        List<ItemEntity> spoiledGround = new ArrayList<>();
         for (var entity : level.getAllEntities()) {
             if (entity instanceof Container container) {
                 scanContainer(container, now);
             } else if (entity instanceof ItemEntity itemEntity) {
                 ItemStack ground = itemEntity.getItem();
                 FreshnessStamper.stamp(ground, now);
-                ItemStack converted = spoiledResult(ground, now);
-                if (converted != null) {
-                    itemEntity.setItem(converted);
+                if (disposeSpoiled && FreshnessMath.isSpoiled(ground, now)) {
+                    spoiledGround.add(itemEntity);
                 }
             }
+        }
+        // 循环外统一移除，避免在实体迭代中改动实体表
+        for (ItemEntity itemEntity : spoiledGround) {
+            itemEntity.discard();
         }
     }
 
@@ -58,35 +67,47 @@ public final class FreshnessScanner {
         for (int i = 0; i < container.getContainerSize(); i++) {
             ItemStack stack = container.getItem(i);
             FreshnessStamper.stamp(stack, now);
-            convertIfSpoiled(container, i, stack, now);
+            removeIfSpoiled(container, i, stack, now);
         }
     }
 
-    /** 已完全变质的食物整堆替换为配置产物，数量守恒；产物自身永不腐坏，不会被二次转换。 */
-    private static void convertIfSpoiled(Container container, int slot, ItemStack stack, long now) {
-        ServerConfig cfg = ServerConfig.get();
-        if (!cfg.spoiledConversion()) return;
-        ItemStack converted = spoiledResult(stack, now);
-        if (converted != null) {
-            container.setItem(slot, converted);
-        }
+    /** 已完全变质的食物整堆消失；spoiled_conversion=false 时保留（不处置）。 */
+    private static void removeIfSpoiled(Container container, int slot, ItemStack stack, long now) {
+        if (!ServerConfig.get().spoiledConversion()) return;
+        if (!FreshnessMath.isSpoiled(stack, now)) return;
+        container.setItem(slot, ItemStack.EMPTY);
     }
 
-    /** 计算变质产物；未变质或不适用返回 null。配置了非法/无效物品 id 时保守跳过。 */
-    private static ItemStack spoiledResult(ItemStack stack, long now) {
-        FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
-        if (stamp == null) return null;
-        ShelfLife life = stack.get(BiteComponents.SHELF_LIFE);
-        if (life == null || life.spoilTicks() <= 0) return null;
-        if (FreshnessMath.fraction(now, stamp, life) > 0.0) return null;
-
-        Identifier resultId = Identifier.tryParse(ServerConfig.get().spoiledResult());
-        if (resultId == null) return null;
-        var resultHolder = BuiltInRegistries.ITEM.get(resultId);
-        if (resultHolder.isEmpty()) return null;
-        Item result = resultHolder.get().value();
-        if (result == Items.AIR) return null;
-
-        return new ItemStack(result, stack.getCount());
-    }
+    // ── 暂缓：变质 → 腐烂物转换（当前口径：变质食物直接消失）──────────────────
+    // 恢复转换时：取消下面两个方法的注释，把 removeIfSpoiled 的
+    // setItem(EMPTY) 换回 convertIfSpoiled、scanLevel 里的 discard 循环
+    // 换回 itemEntity.setItem(spoiledResult(...))。
+    //
+    // /** 已完全变质的食物整堆替换为配置产物，数量守恒；产物自身永不腐坏，不会被二次转换。 */
+    // private static void convertIfSpoiled(Container container, int slot, ItemStack stack, long now) {
+    //     ServerConfig cfg = ServerConfig.get();
+    //     if (!cfg.spoiledConversion()) return;
+    //     ItemStack converted = spoiledResult(stack, now);
+    //     if (converted != null) {
+    //         container.setItem(slot, converted);
+    //     }
+    // }
+    //
+    // /** 计算变质产物；未变质或不适用返回 null。配置了非法/无效物品 id 时保守跳过。 */
+    // private static ItemStack spoiledResult(ItemStack stack, long now) {
+    //     FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
+    //     if (stamp == null) return null;
+    //     ShelfLife life = stack.get(BiteComponents.SHELF_LIFE);
+    //     if (life == null || life.spoilTicks() <= 0) return null;
+    //     if (FreshnessMath.fraction(now, stamp, life) > 0.0) return null;
+    //
+    //     Identifier resultId = Identifier.tryParse(ServerConfig.get().spoiledResult());
+    //     if (resultId == null) return null;
+    //     var resultHolder = BuiltInRegistries.ITEM.get(resultId);
+    //     if (resultHolder.isEmpty()) return null;
+    //     Item result = resultHolder.get().value();
+    //     if (result == Items.AIR) return null;
+    //
+    //     return new ItemStack(result, stack.getCount());
+    // }
 }

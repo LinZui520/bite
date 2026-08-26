@@ -2,7 +2,6 @@ package com.eamon.bite;
 
 import com.eamon.bite.command.BiteCommands;
 import com.eamon.bite.component.BiteComponents;
-import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.component.ShelfLife;
 import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.freshness.FreshnessClock;
@@ -86,20 +85,11 @@ public class BiteMod implements ModInitializer {
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (!ServerConfig.get().spoiledInedible()) return InteractionResult.PASS;
             ItemStack stack = player.getItemInHand(hand);
-            if (!isSpoiledInedible(stack, FreshnessClock.now(level))) return InteractionResult.PASS;
+            if (!FreshnessMath.isSpoiled(stack, FreshnessClock.now(level))) return InteractionResult.PASS;
             if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.sendOverlayMessage(Component.translatable("bite.msg.spoiled_inedible"));
             }
             return InteractionResult.FAIL;
         });
-    }
-
-    /** 变质禁食判定（独立纯函数，供回调与 gametest 共用）。 */
-    public static boolean isSpoiledInedible(ItemStack stack, long now) {
-        FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
-        if (stamp == null) return false;
-        ShelfLife life = stack.get(BiteComponents.SHELF_LIFE);
-        if (life == null || life.spoilTicks() <= 0) return false;
-        return FreshnessMath.fraction(now, stamp, life) <= 0.0;
     }
 }
