@@ -1,7 +1,7 @@
 package com.eamon.bite.component;
 
-import com.eamon.bite.freshness.FreshnessMath;
 import com.eamon.bite.freshness.FreshnessClock;
+import com.eamon.bite.freshness.FreshnessMath;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.ChatFormatting;
@@ -14,6 +14,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.TooltipProvider;
 
+import java.util.Locale;
 import java.util.function.Consumer;
 
 /** 打标时刻的游戏刻（game time，非 day time）。 */
@@ -50,8 +51,8 @@ public record FreshnessStamp(long creationGameTick) implements TooltipProvider {
 
     private static Component formatRemaining(long ticks) {
         double days = ticks / 24000.0;
-        if (days >= 1.0) return Component.translatable("bite.time.days", String.format(java.util.Locale.ROOT, "%.1f", days));
+        if (days >= 1.0) return Component.translatable("bite.time.days", String.format(Locale.ROOT, "%.1f", days));
         double hours = days * 24.0;
-        return Component.translatable("bite.time.hours", String.format(java.util.Locale.ROOT, "%.1f", hours));
+        return Component.translatable("bite.time.hours", String.format(Locale.ROOT, "%.1f", hours));
     }
 }

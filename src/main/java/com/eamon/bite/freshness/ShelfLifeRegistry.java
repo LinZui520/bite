@@ -11,25 +11,13 @@ import net.minecraft.world.item.Item;
 import java.util.List;
 
 /**
- * 保质期解析：item_overrides > c:foods 分类 > 兜底 default。
+ * 保质期解析：item_overrides &gt; c:foods 分类 &gt; default 兜底。
  * 返回游戏刻（24000/天）；-1 = 永不腐坏 / 非食物。
- *
- * <p>Checkpoint resolutions (MC 26.2, verified via javap + genSources):
- * <ul>
- *   <li>Registry ID: {@code BuiltInRegistries.ITEM.getKey(item)} returns
- *       {@link Identifier} (candidate A — {@code Registry#getKey(T)} confirmed on
- *       {@code net.minecraft.core.Registry}).</li>
- *   <li>Item tag check: {@code BuiltInRegistries.ITEM.wrapAsHolder(item)} returns
- *       {@code Holder<Item>} (non-deprecated; {@code Item.builtInRegistryHolder()}
- *       is {@code @Deprecated} in 26.2). {@code Holder#is(TagKey)} confirmed.</li>
- *   <li>Food check: {@code item.components()} returns
- *       {@code DataComponentMap}; {@code DataComponentMap#has(DataComponentType)} confirmed.</li>
- * </ul>
  */
 public final class ShelfLifeRegistry {
     public static final long DAY = 24000L;
 
-    /** 顺序即优先级（先命中先用）。 */
+    /** 分类判定顺序（先命中先用）。 */
     private static final List<String> CATEGORIES = List.of(
         "raw_meat", "raw_fish", "cooked_meat", "cooked_fish",
         "bread", "vegetable", "fruit", "berry", "dough",
@@ -37,31 +25,26 @@ public final class ShelfLifeRegistry {
 
     private ShelfLifeRegistry() {}
 
-    /**
-     * 解析单物品保质期（游戏刻）。
-     *
-     * <p>优先级：item_overrides（-1 = 永不）> 非食物(-1) > c:foods 分类 >
-     * default > 兜底 -1。
-     *
-     * @return 游戏刻；-1 = 永不腐坏或非食物
-     */
+    /** 解析单物品保质期（游戏刻）；-1 = 永不腐坏或非食物。 */
     public static long resolveShelfLifeTicks(Item item) {
         ServerConfig config = ServerConfig.get();
         String id = describe(item);
         Integer override = config.itemOverrides().get(id);
         if (override != null) return override < 0 ? -1 : override * DAY;
         if (!isFood(item)) return -1;
-        String cat = categoryOf(item);
-        Integer days = config.shelfLifeDays().get(cat);
+        Integer days = config.shelfLifeDays().get(categoryOf(item));
         if (days == null) days = config.shelfLifeDays().get("default");
         if (days == null || days < 0) return -1;
         return days * DAY;
     }
 
-    /**
-     * 返回物品所属的 c:foods 分类（调试用）。
-     * 顺序按 {@link #CATEGORIES}，未命中返回 "default"。
-     */
+    /** 物品是否为食物（拥有 FOOD 或 CONSUMABLE 组件）。 */
+    public static boolean isFood(Item item) {
+        return item.components().has(DataComponents.FOOD)
+            || item.components().has(DataComponents.CONSUMABLE);
+    }
+
+    /** 返回物品所属的 c:foods 分类，未命中返回 "default"。 */
     private static String categoryOf(Item item) {
         for (String cat : CATEGORIES) {
             TagKey<Item> tag = TagKey.create(Registries.ITEM,
@@ -71,20 +54,7 @@ public final class ShelfLifeRegistry {
         return "default";
     }
 
-    /**
-     * 判断物品是否为食物（用于默认组件接线）。
-     * 26.2 通过 FOOD 或 CONSUMABLE 组件判定。
-     */
-    public static boolean isFoodItemForDefaults(Item item) {
-        return isFood(item);
-    }
-
-    private static boolean isFood(Item item) {
-        return item.components().has(DataComponents.FOOD)
-            || item.components().has(DataComponents.CONSUMABLE);
-    }
-
-    /** 返回物品注册表 ID（如 "minecraft:apple"）。 */
+    /** 物品注册表 ID（如 "minecraft:apple"）。 */
     private static String describe(Item item) {
         return BuiltInRegistries.ITEM.getKey(item).toString();
     }

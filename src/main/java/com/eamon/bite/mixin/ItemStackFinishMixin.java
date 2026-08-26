@@ -22,38 +22,20 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 进食惩罚 mixin（spec §8）：在 {@code ItemStack.finishUsingItem} 的 HEAD 捕获
- * 玩家 FoodData 快照，RETURN 处按新鲜度缩放营养增量 + 饱和度增量，
- * 并在 OLD 区间概率施加「饥饿」debuff。
+ * 进食惩罚（spec §8）：在 {@code ItemStack.finishUsingItem} 的 HEAD 捕获玩家
+ * FoodData 快照，RETURN 处按新鲜度缩放营养与饱和度增量，并在 OLD 区间概率
+ * 施加「饥饿」debuff。
  *
- * <p>缩放语义（review r1 修正后）：
+ * <p>缩放语义：
  * <ul>
- *   <li>营养增量：仅 delta &gt; 0 时缩放（delta=0 为满食欲被原版 clamp 的 no-op）</li>
- *   <li>饱和度增量：<b>独立于 delta</b>——满食欲（delta=0）时原版
- *       {@code FoodData.eat} 仍添加饱和度，此处必须照样缩放，
- *       否则满食欲吃 STALE 食物获得全额饱和度（bypass）</li>
- *   <li>饱和度上限：缩放后钳制到新 foodLevel，对齐原版
- *       {@code FoodData.add} 的 {@code clamp(sat, 0, foodLevel)} 语义</li>
+ *   <li>营养：delta=0（满食欲被原版 clamp 的 no-op）时跳过</li>
+ *   <li>饱和度：<b>独立于营养缩放</b>——满食欲时原版 {@code FoodData.eat}
+ *       仍添加饱和度，不缩放会漏惩罚（曾为真实 bug）</li>
+ *   <li>饱和度上限对齐原版语义：clamp 到缩放后的 foodLevel</li>
  * </ul>
  *
- * <p>26.2 检查点（genSources 验证）：
- * <ul>
- *   <li>目标方法 {@code public ItemStack finishUsingItem(Level, LivingEntity)}
- *       —— 位于 {@link ItemStack}（非 {@code Item}），第 391 行。
- *       内部委托 {@code Item.finishUsingItem(this, level, entity)} →
- *       {@code Consumable.onConsume} → {@code FoodProperties.onConsume}
- *       → {@code player.getFoodData().eat(this)}，故 RETURN 时 FoodData 已更新。</li>
- *   <li>{@link MobEffects#HUNGER} 在 26.2 为 {@code Holder<MobEffect>}，
- *       {@link MobEffectInstance#MobEffectInstance(Holder, int, int)} 构造器存在。</li>
- *   <li>{@link FoodData#getFoodLevel}/{@code setFoodLevel(int)} /
- *       {@link FoodData#getSaturationLevel}/{@code setSaturation(float)} 签名确认。</li>
- *   <li>{@link FreshnessClock#now()} 用于无 Level 上下文时的 game time 读取
- *       （与 {@code StackingRules} 等其它静态钩子一致）。</li>
- * </ul>
- *
- * <p>状态管理：{@code @Unique} 实例字段在 HEAD 写入、RETURN 读取后复位。
- * 同一 ItemStack 实例不会出现并发 finishUsingItem（MC 服务器单线程游戏逻辑），
- * 且 {@code bite$tracked} 在 RETURN 立即置 false，无跨调用残留。
+ * <p>{@code @Unique} 状态 HEAD 写、RETURN 读后立即复位；游戏逻辑单线程，
+ * 同一栈不会并发进食。
  */
 @Mixin(ItemStack.class)
 public abstract class ItemStackFinishMixin {
@@ -81,8 +63,7 @@ public abstract class ItemStackFinishMixin {
     private void bite$applyPenalty(Level level, LivingEntity entity, CallbackInfoReturnable<ItemStack> cir) {
         if (!bite$tracked) return;
         bite$tracked = false;
-        // instanceof 检查省略：bite$tracked=true 仅在 HEAD 通过 Player 检查后置位，
-        // 同一 finishUsingItem 调用的 entity 引用不变，此处必为 Player
+        // entity 在 HEAD 已通过 Player 检查（bite$tracked 只在其后置位），此处必为 Player
         Player player = (Player) entity;
         double fraction = FreshnessMath.fraction(FreshnessClock.now(), bite$stamp, bite$life);
         double scale = SpoiledFoodHandler.nutritionScale(fraction);
@@ -93,12 +74,10 @@ public abstract class ItemStackFinishMixin {
             if (delta > 0) {
                 food.setFoodLevel(bite$foodBefore + (int) Math.round(delta * scale));
             }
-            // 饱和度缩放：独立于 delta——满食欲（delta=0）时原版仍加饱和度，
-            // 必须照样缩放（review r1 critical fix）
+            // 饱和度缩放：独立于营养——满食欲（delta=0）时原版仍加饱和度，必须照样缩放
             float satDelta = food.getSaturationLevel() - bite$saturationBefore;
             if (satDelta != 0.0f) {
                 float scaled = bite$saturationBefore + satDelta * (float) scale;
-                // 对齐原版 FoodData.add 语义：饱和度上限 = 缩放后的 foodLevel
                 food.setSaturation(Mth.clamp(scaled, 0.0F, food.getFoodLevel()));
             }
         }

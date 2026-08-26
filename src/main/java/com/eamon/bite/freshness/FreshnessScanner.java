@@ -8,44 +8,28 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
-import net.minecraft.world.level.chunk.LevelChunk;
 
 /**
- * 懒扫描：玩家背包 + 已加载区块容器 + 容器实体。未打标的食物首次被观察到时打标。
+ * 懒扫描：按配置周期观察世界里的食物——未打标的首次被观察到时打标，
+ * 已完全变质的按配置转换为产物（数量守恒）。
  *
- * <p>Checkpoint (MC 26.2): {@code ChunkMap.getChunks()} 不存在。公开等价 API：
- * <ul>
- *   <li>{@link net.minecraft.server.level.ServerChunkCache#chunkMap} — {@code public final} 字段</li>
- *   <li>{@link net.minecraft.server.level.ChunkMap#forEachReadyToSendChunk} —
- *       遍历 {@code visibleChunkMap} 中所有已就绪的 {@link LevelChunk}</li>
- * </ul>
- * 不需要 accessor mixin。
- *
- * <p>未开箱的 {@link RandomizableContainerBlockEntity}（loot table != null）跳过，
- * 避免触发 loot 生成。
+ * <p>未开箱的 loot 容器（loot table 尚未生成）跳过，避免触发 loot 生成。
  */
 public final class FreshnessScanner {
     private FreshnessScanner() {}
 
-    /**
-     * 扫描整个维度：玩家背包、已加载区块容器、容器实体。
-     *
-     * @param level 服务端维度
-     * @param now   当前游戏刻（{@code level.getGameTime()}）
-     */
+    /** 扫描整个维度：玩家背包、已加载区块容器、容器实体与地面掉落物。 */
     public static void scanLevel(ServerLevel level, long now) {
-        // (a) 在线玩家背包
         for (var player : level.players()) {
             scanContainer(player.getInventory(), now);
         }
-        // (b) 已加载区块的方块实体容器
         level.getChunkSource().chunkMap.forEachReadyToSendChunk(chunk -> {
             for (var be : chunk.getBlockEntities().values()) {
-                // 未开箱的 loot 容器跳过（不观察）
                 if (be instanceof RandomizableContainerBlockEntity rcbe
                     && rcbe.getLootTable() != null) {
                     continue;
@@ -55,12 +39,11 @@ public final class FreshnessScanner {
                 }
             }
         });
-        // (c) 容器实体（如箱子矿车/漏斗矿车等原版容器实体，及其他 mod 的容器实体）
-        // (d) 地面掉落物（ItemEntity）—— 已加载区块里躺在地上的食物同样首见打标
+        // 容器实体（箱子矿车等）与地面掉落物不在方块实体之列，单独扫
         for (var entity : level.getAllEntities()) {
             if (entity instanceof Container container) {
                 scanContainer(container, now);
-            } else if (entity instanceof net.minecraft.world.entity.item.ItemEntity itemEntity) {
+            } else if (entity instanceof ItemEntity itemEntity) {
                 ItemStack ground = itemEntity.getItem();
                 FreshnessStamper.stamp(ground, now);
                 ItemStack converted = spoiledResult(ground, now);
@@ -79,13 +62,7 @@ public final class FreshnessScanner {
         }
     }
 
-    /**
-     * 变质转换（v1.0.1）：fraction ≤ 0 的食物整堆替换为配置的产物
-     * （默认 bite:rotten_organic），数量守恒。
-     *
-     * <p>转换产物自身挂 SHELF_LIFE=NEVER（永不腐坏），天然不会被二次转换。
-     * 转换随懒扫描周期批量发生（默认 5 秒一轮），天然限流。
-     */
+    /** 已完全变质的食物整堆替换为配置产物，数量守恒；产物自身永不腐坏，不会被二次转换。 */
     private static void convertIfSpoiled(Container container, int slot, ItemStack stack, long now) {
         ServerConfig cfg = ServerConfig.get();
         if (!cfg.spoiledConversion()) return;
@@ -95,7 +72,7 @@ public final class FreshnessScanner {
         }
     }
 
-    /** 计算变质产物；未变质/不适用返回 null。 */
+    /** 计算变质产物；未变质或不适用返回 null。配置了非法/无效物品 id 时保守跳过。 */
     private static ItemStack spoiledResult(ItemStack stack, long now) {
         FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
         if (stamp == null) return null;
@@ -104,9 +81,9 @@ public final class FreshnessScanner {
         if (FreshnessMath.fraction(now, stamp, life) > 0.0) return null;
 
         Identifier resultId = Identifier.tryParse(ServerConfig.get().spoiledResult());
-        if (resultId == null) return null; // 配置了非法 id 字符串 → 保守跳过
+        if (resultId == null) return null;
         var resultHolder = BuiltInRegistries.ITEM.get(resultId);
-        if (resultHolder.isEmpty()) return null; // 配置了无效 id → 保守跳过
+        if (resultHolder.isEmpty()) return null;
         Item result = resultHolder.get().value();
         if (result == Items.AIR) return null;
 

@@ -32,20 +32,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 新鲜度系统 GameTest 基建（后续任务的测试追加到本类）。
+ * 新鲜度系统 GameTest。
  *
- * <p>Checkpoint resolutions (MC 26.2, Fabric API 0.158.0+26.2):
+ * <p>测试基建要点：
  * <ul>
- *   <li>{@code FabricGameTest} 接口在 26.2 已不存在 — entrypoint {@code fabric-gametest}
- *       接受任意 Object，由 {@code TestAnnotationLocator} 扫描
- *       {@link GameTest} 注解方法（public、非 static、单参
- *       {@link GameTestHelper}、返回 void）。</li>
- *   <li>{@link GameTestHelper#absolutePos} 返回 {@link BlockPos}（非 Vec3），
- *       故用 {@link Vec3#atCenterOf} 转 {@code ORIGIN}。</li>
+ *   <li>entrypoint {@code fabric-gametest} 接受任意类，由
+ *       {@code TestAnnotationLocator} 扫描 {@link GameTest} 注解方法
+ *       （public、非 static、单参 {@link GameTestHelper}、返回 void）。</li>
  *   <li>断言用 {@link GameTestHelper#fail(String)}（junit 不在 gametest 编译路径）。</li>
  *   <li>{@link LootTable#getRandomItems(LootParams, java.util.function.Consumer)}
- *       内部链路 {@code getRandomItemsRaw(LootParams)→getRandomItemsRaw(LootContext)}，
- *       后者被 Fabric {@code LootTableMixin} {@code @WrapMethod} 拦截，触发
+ *       内部链路被 Fabric {@code LootTableMixin} {@code @WrapMethod} 拦截，触发
  *       {@code MODIFY_DROPS}，故打标会在返回给 consumer 前生效。</li>
  * </ul>
  */
@@ -125,12 +121,12 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 等价性放宽 mixin（Task 9）：两个不同 FRESHNESS 戳的同种未腐坏食物，
+     * 等价性放宽 mixin：两个不同 FRESHNESS 戳的同种未腐坏食物，
      * 经 {@code ItemStack.isSameItemSameComponents} 放宽后应能通过
      * {@link SimpleContainer#addItem} 合并到同一槽位。
      *
      * <p>链路：{@code addItem → moveItemToOccupiedSlotsWithSameType →
-     * ItemStack.isSameItemSameComponents(a, b)}（已 {@code javap} 确认 26.2 字节码）。
+     * ItemStack.isSameItemSameComponents(a, b)}。
      * mixin 在 RETURN 处把 false 改写为 true，使合并通过。
      */
     @GameTest(maxTicks = 20)
@@ -259,9 +255,9 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 漏斗合并重算（Task 10 补充站点）：漏斗从上方箱子吸取不同新鲜度面包时，
-     * 合并发生在 {@code HopperBlockEntity.tryMoveInItem}（brief 5 站点表把漏斗
-     * 错误映射到 SimpleContainer.moveItemsBetweenStacks，genSources 修正）。
+     * 漏斗合并重算：漏斗从上方箱子吸取不同新鲜度面包时，
+     * 合并发生在 {@code HopperBlockEntity.tryMoveInItem}——漏斗有独立的
+     * count 移动路径，不走 SimpleContainer.moveItemsBetweenStacks。
      *
      * <p>验证链路：
      * <ul>
@@ -389,20 +385,19 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 进食营养缩放（Task 11）：STALE 食物（fraction 0.4）应按 nutritionScaleStale
+     * 进食营养缩放：STALE 食物（fraction 0.4）应按 nutritionScaleStale
      * （默认 0.75）缩放营养增量。
      *
      * <p>验证链路：
      * <ul>
-     *   <li>面包 nutrition=5（genSources: {@code Foods.BREAD = Builder.nutrition(5).saturationModifier(0.6F).build()}）</li>
+     *   <li>面包 nutrition=5、saturationModifier=0.6F</li>
      *   <li>初始 foodLevel=10；原版 eat 后 → 10+5=15</li>
      *   <li>STALE scale 0.75 → delta 5*0.75=3.75 → round 4 → 10+4=14</li>
      *   <li>fraction 0.4 ∈ (oldThreshold=0.25, staleThreshold=0.5] → STALE → scale 0.75 ✓</li>
      * </ul>
      *
-     * <p>26.2 适配：brief 使用 {@code makeTallerMockPlayer}——26.2 GameTestHelper 无此方法，
-     * 改用 {@link GameTestHelper#makeMockPlayer(GameType)}（返回 {@link net.minecraft.world.entity.player.Player}）。
-     * Player 拥有 FoodData，finishUsingItem 链路
+     * <p>用 {@link GameTestHelper#makeMockPlayer(GameType)} 造 Player
+     * （持有 FoodData），finishUsingItem 链路
      * {@code ItemStack.finishUsingItem → Item.finishUsingItem → Consumable.onConsume
      * → FoodProperties.onConsume → player.getFoodData().eat(this)} 正常触发。
      *
@@ -472,7 +467,7 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 满食欲路径（Task 11 review r1 修复）：foodLevel=20 时原版 FoodData.add 把
+     * 满食欲路径：foodLevel=20 时原版 FoodData.add 把
      * 营养增量钳制为 0（delta=0），但<b>仍添加饱和度</b>——饱和度缩放不得因
      * delta=0 被跳过，否则满食欲吃 STALE 食物获得全额饱和度（bypass）。
      *
@@ -480,8 +475,7 @@ public class FreshnessGameTests {
      * <ul>
      *   <li>对照：food=20 吃 FRESH 面包（scale=1.0，mixin 不介入）→
      *       测原版饱和度增量 satDeltaFresh
-     *       （面包 saturation = 5*0.6*2 = 6.0，genSources Foods.BREAD +
-     *       FoodConstants.saturationByModifier）</li>
+     *       （面包 saturation = 5*0.6*2 = 6.0）</li>
      *   <li>治疗：food=20 吃 STALE 面包（fraction 0.4 → scale 0.75）→
      *       饱和度增量应为 satDeltaFresh * 0.75</li>
      *   <li>food 应保持 20（原版 clamp；delta=0 时 mixin 不动 foodLevel）</li>
@@ -710,7 +704,7 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 变质转换（v1.0.1）：变质食物（fraction ≤ 0）在懒扫描周期后
+     * 变质转换：变质食物（fraction ≤ 0）在懒扫描周期后
      * 整堆替换为腐烂物，数量守恒；未变质食物不被转换。
      *
      * <p>保质期用 100 游戏天隔离 gametest 骨架的快进漂移（同 hopper 测试）：
@@ -766,7 +760,7 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 烹饪刷新一半腐坏（饥荒「Cooking refreshes spoilage」，v1.0.2）：
+     * 烹饪刷新一半腐坏（饥荒「Cooking refreshes spoilage」）：
      * 生鳕鱼（保质期 3 天，饥荒制）半腐坏（fraction 0.5）时烤制，
      * 产物熟鳕鱼（保质期 6 天）应继承一半腐坏量 → fraction 0.75。
      *
@@ -801,7 +795,7 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 合成继承新鲜度（v1.0.7，饥荒锅料理语义）：
+     * 合成继承新鲜度（饥荒锅料理语义）：
      * 产物腐坏量 = 全部食物原料平均腐坏量的一半。
      *
      * <p>用例：面包配方 3 小麦 —— 2 个全新（fraction 1.0）+ 1 个半腐（0.5），
@@ -856,7 +850,7 @@ public class FreshnessGameTests {
     }
 
     /**
-     * 地面掉落物打标（v1.0.3）：懒扫描覆盖 ItemEntity ——
+     * 地面掉落物打标：懒扫描覆盖 ItemEntity ——
      * 已加载区块里躺在地上的食物被首见打标开始计时；
      * 彻底变质的地面食物会被转换成腐烂物。
      */

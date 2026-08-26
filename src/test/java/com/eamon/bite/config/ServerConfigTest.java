@@ -63,7 +63,7 @@ class ServerConfigTest {
         // 种子类 40 天（比照饥荒种子）
         assertEquals(40, ov.get("minecraft:wheat_seeds"));
         assertEquals(40, ov.get("minecraft:pumpkin_seeds"));
-        // 蜂蜜永不腐坏（v1.0.5 用户口径，对齐现实蜂蜜）
+        // 蜂蜜永不腐坏（对齐现实蜂蜜）
         assertEquals(-1, ov.get("minecraft:honey_bottle"));
         assertEquals(-1, ov.get("minecraft:honeycomb"));
     }
@@ -79,7 +79,7 @@ class ServerConfigTest {
         Map<String, Integer> ov = ServerConfig.DEFAULT.itemOverrides();
         assertEquals(-1, ov.get("minecraft:golden_apple"));
         assertEquals(-1, ov.get("minecraft:enchanted_golden_apple"));
-        // 药水/牛奶/金胡萝卜不需要新鲜度（用户口径 v1.0.4）
+        // 药水/牛奶/金胡萝卜不需要新鲜度
         assertEquals(-1, ov.get("minecraft:potion"));
         assertEquals(-1, ov.get("minecraft:milk_bucket"));
         assertEquals(-1, ov.get("minecraft:golden_carrot"));
@@ -92,7 +92,7 @@ class ServerConfigTest {
         Map<String, Integer> ov = ServerConfig.DEFAULT.itemOverrides();
         // 蛋糕需要新鲜度（料理档 15 天）
         assertEquals(15, ov.get("minecraft:cake"));
-        // 腐肉需要新鲜度，40 天（原为豁免；用户口径 v1.0.4）
+        // 腐肉需要新鲜度，40 天
         assertEquals(40, ov.get("minecraft:rotten_flesh"));
     }
 

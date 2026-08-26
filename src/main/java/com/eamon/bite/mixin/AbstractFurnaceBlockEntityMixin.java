@@ -11,13 +11,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 烹饪刷新（饥荒「Cooking refreshes spoilage」，spec v1.0.2）：
- * 熔炉/烟熏炉/营火完成烹饪时，产物继承原料腐坏量的一半。
- *
- * <p>26.2 签名（javap 验证）：
- * {@code private static void burn(NonNullList<ItemStack> slots,
- * ItemStack input, ItemStack result)} —— 单点覆盖全部炉类烹饪。
- * 注入 TAIL：vanilla 把产物放入 result 槽后，对产物按原料打标。
+ * 烹饪刷新（饥荒「烹饪把腐坏量减半」）：熔炉/烟熏炉/营火完成烹饪时，
+ * 产物继承原料腐坏量的一半。burn 是全部炉类的单点，注入 TAIL——
+ * 原版把产物放入 result 槽之后。
  */
 @Mixin(AbstractFurnaceBlockEntity.class)
 public abstract class AbstractFurnaceBlockEntityMixin {

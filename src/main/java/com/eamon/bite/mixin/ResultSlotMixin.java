@@ -17,17 +17,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 合成继承新鲜度（v1.0.7，饥荒锅料理语义）：
- * 玩家从合成结果槽取走产物时，产物继承合成格内全部食物原料的
- * 平均腐坏量的一半（FreshnessStamper.stampCrafted）。
+ * 合成继承新鲜度（饥荒锅料理语义）：玩家取走合成产物时，产物继承
+ * 合成格内全部食物原料的平均腐坏量的一半（{@link FreshnessStamper#stampCrafted}）。
+ * onTake 在原版消耗原料（shrink）之前调用，TAIL 时原料仍在格中可读。
  *
- * <p>26.2 签名（javap 验证）：{@code ResultSlot} 持有
- * {@code private final CraftingContainer craftSlots}；{@code onTake(Player, ItemStack)}
- * 在 vanilla 消耗原料（shrink）之前调用——TAIL 时原料仍在格中，可读。
- *
- * <p>覆盖 2×2 手持合成与 3×3 工作台（同一 ResultSlot）。
- * 已知边界：自动合成器（Crafter）不走 ResultSlot，其产物由懒扫描
- * 首见打标（全新）——不继承。
+ * <p>覆盖 2×2 手持合成与 3×3 工作台。已知边界：自动合成器（Crafter）不走
+ * ResultSlot，其产物由懒扫描首见打标（全新，不继承）。
  */
 @Mixin(ResultSlot.class)
 public abstract class ResultSlotMixin {

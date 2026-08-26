@@ -10,12 +10,15 @@ import net.minecraft.resources.Identifier;
 
 import static com.eamon.bite.BiteMod.MOD_ID;
 
-/** 数据组件类型注册。静态初始化在首次类引用时触发 Registry.register。 */
+/** 数据组件类型注册：{@code bite:freshness} / {@code bite:shelf_life}。 */
 public final class BiteComponents {
     public static final DataComponentType<FreshnessStamp> FRESHNESS = register("freshness", FreshnessStamp.CODEC, FreshnessStamp.STREAM_CODEC);
     public static final DataComponentType<ShelfLife> SHELF_LIFE = register("shelf_life", ShelfLife.CODEC, ShelfLife.STREAM_CODEC);
 
     private BiteComponents() {}
+
+    /** 显式触发静态注册（注册发生在字段初始化里，入口调用以避免依赖类加载副作用）。 */
+    public static void init() {}
 
     private static <T> DataComponentType<T> register(String path, Codec<T> codec, StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec) {
         return Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE,

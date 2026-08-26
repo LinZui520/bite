@@ -11,7 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
-/** 服务端权威配置。v1 重启生效（spec §9）。 */
+/** 服务端权威配置（config/bite/server.json），重启生效。 */
 public record ServerConfig(
     boolean enabled,
     int scanIntervalTicks,
@@ -33,8 +33,8 @@ public record ServerConfig(
 
     public static ServerConfig get() { return instance; }
 
+    /** 默认保质期天数直搬饥荒（DST）梯度：分类默认 + 逐物品 overrides。 */
     private static ServerConfig createDefault() {
-        // 饥荒（DST）保鲜天数直搬：分类默认 + 逐物品 overrides（见 spec v1.0.2）
         Map<String, Integer> shelf = new LinkedHashMap<>();
         shelf.put("raw_meat", 6); shelf.put("raw_fish", 3);
         shelf.put("cooked_meat", 10); shelf.put("cooked_fish", 6);
@@ -42,39 +42,39 @@ public record ServerConfig(
         shelf.put("berry", 6); shelf.put("dough", 10);
         shelf.put("bread", 15); shelf.put("cookie", 15); shelf.put("pie", 15); shelf.put("candy", 15);
         shelf.put("soup", 6);
-        shelf.put("default", 15); // 料理档（DST 大多菜肴 10-20 天）
+        shelf.put("default", 15); // 兜底：料理档（DST 大多菜肴 10-20 天）
+
         Map<String, Integer> overrides = new TreeMap<>();
-        // 豁免（永不腐坏）
+        // 永不腐坏：金苹果系、药水、牛奶、金胡萝卜等魔法/特殊食物
         overrides.put("minecraft:golden_apple", -1);
         overrides.put("minecraft:enchanted_golden_apple", -1);
-        // 药水/牛奶/金胡萝卜不需要新鲜度（v1.0.4 用户口径）
         overrides.put("minecraft:potion", -1);
         overrides.put("minecraft:milk_bucket", -1);
         overrides.put("minecraft:golden_carrot", -1);
         overrides.put("minecraft:spider_eye", -1);
         overrides.put("minecraft:poisonous_potato", -1);
-        // 腐肉需要新鲜度：40 天（v1.0.4 用户口径，原为豁免）
+        // 蜂蜜对齐现实：永不腐坏（蜜脾同）
+        overrides.put("minecraft:honey_bottle", -1);
+        overrides.put("minecraft:honeycomb", -1);
+        // 腐肉本身已是腐坏物：放宽到 40 天
         overrides.put("minecraft:rotten_flesh", 40);
-        // 蛋糕需要新鲜度：料理档 15 天
+        // 蛋糕按料理档 15 天
         overrides.put("minecraft:cake", 15);
-        // 烤制浆果坏得快（饥荒：浆果 6 → 烤浆果 3）
+        // 浆果 6 天（DST：烤浆果反而坏得更快，取生浆果档）
         overrides.put("minecraft:sweet_berries", 6);
         overrides.put("minecraft:glow_berries", 6);
-        // 烤马铃薯 6（饥荒：马铃薯 10 → 烤 6）
+        // 烤制后坏得更快（DST：马铃薯 10 → 烤 6）
         overrides.put("minecraft:baked_potato", 6);
-        // 熟鱼 6（饥荒：鱼 3 → 熟鱼 6，熟反而更耐放）
+        // 熟鱼比生鱼耐放（DST：鱼 3 → 熟鱼 6）
         overrides.put("minecraft:cooked_cod", 6);
         overrides.put("minecraft:cooked_salmon", 6);
-        // 种子类 40 天（饥荒种子）
+        // 种子类 40 天（DST 种子）
         overrides.put("minecraft:wheat_seeds", 40);
         overrides.put("minecraft:pumpkin_seeds", 40);
         overrides.put("minecraft:melon_seeds", 40);
         overrides.put("minecraft:beetroot_seeds", 40);
         overrides.put("minecraft:torchflower_seeds", 40);
         overrides.put("minecraft:pitcher_seeds", 40);
-        // 蜂蜜永不腐坏（v1.0.5 用户口径，对齐现实蜂蜜；蜜脾同）
-        overrides.put("minecraft:honey_bottle", -1);
-        overrides.put("minecraft:honeycomb", -1);
         return new ServerConfig(true, 20, shelf, overrides,
             0.5, 0.2, 0.75, 0.5, 0.3, 160, true,
             true, "bite:rotten_organic");
@@ -89,6 +89,7 @@ public record ServerConfig(
         int scanInterval = Math.max(1, orDefault(raw.scan_interval_ticks, d.scanIntervalTicks));
         double stale = orDefault(raw.stale_threshold, d.staleThreshold);
         double old = orDefault(raw.old_threshold, d.oldThreshold);
+        // 非法配置防御：stale 必须严格大于 old，否则档位判定失真
         if (stale > 0.0 && old > 0.0 && stale <= old) {
             stale = Math.max(old + 0.01, stale);
         }

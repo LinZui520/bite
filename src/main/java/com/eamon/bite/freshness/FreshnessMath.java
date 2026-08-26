@@ -7,7 +7,7 @@ import com.eamon.bite.component.ShelfLife;
 public final class FreshnessMath {
     private FreshnessMath() {}
 
-    /** 百分比 [0,1]。life.spoilTicks < 0 恒为 1。 */
+    /** 新鲜度 [0,1]。永不腐坏（spoilTicks &lt;= 0）恒为 1。 */
     public static double fraction(long now, FreshnessStamp stamp, ShelfLife life) {
         if (life.spoilTicks() <= 0) return 1.0;
         double f = 1.0 - (double) (now - stamp.creationGameTick()) / life.spoilTicks();
@@ -24,6 +24,7 @@ public final class FreshnessMath {
         return new FreshnessStamp(now - age);
     }
 
+    /** 档位划分（渲染/调试用硬阈值；营养缩放走配置阈值，见 SpoiledFoodHandler）。 */
     public static FreshnessGrade grade(double fraction) {
         if (fraction <= 0.0) return FreshnessGrade.SPOILED;
         if (fraction <= 0.25) return FreshnessGrade.OLD;

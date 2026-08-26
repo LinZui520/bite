@@ -18,6 +18,7 @@ import net.fabricmc.fabric.api.item.v1.DefaultItemComponentEvents;
 import net.fabricmc.fabric.api.loot.v3.LootTableEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -26,6 +27,7 @@ import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** mod 入口：装配配置、注册、懒扫描与进食拦截。 */
 public class BiteMod implements ModInitializer {
     public static final String MOD_ID = "bite";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
@@ -33,46 +35,36 @@ public class BiteMod implements ModInitializer {
     @Override
     public void onInitialize() {
         ServerConfig.load(FabricLoader.getInstance().getConfigDir());
-        BiteComponents.FRESHNESS.getClass(); // 触发静态注册
+        BiteComponents.init();
+        BiteItems.init();
         registerDefaultShelfLife();
-        BiteItems.ROTTEN_ORGANIC.getClass(); // 触发物品静态注册
         registerLootDropStamping();
         registerLazyScan();
         registerSpoiledFoodBlock();
         BiteCommands.register();
+        // 无 Level 上下文的静态钩子（合并重算、客户端渲染）读 FreshnessClock，
+        // 每 tick 用主世界时钟刷新它（客户端侧由 BiteModClient 刷新）。
         ServerTickEvents.END_SERVER_TICK.register(server ->
             FreshnessClock.update(gameTime(server.overworld())));
         LOGGER.info("Because It's Too Easy initialized");
     }
 
     /**
-     * 统一的游戏时钟读取口（26.2 WorldClock 体系）。
+     * 游戏时钟统一读取口。
      *
-     * <p>26.2 把玩家可感知、可操作的时间迁入 {@code WorldClock}（ServerClockManager，
-     * {@code /time add|set} 操作它，支持 rate/paused），而 {@code level.getGameTime()}
-     * 只随真实运行 tick 递增、不受 /time 命令影响 —— 两者是独立计数器。
-     * 新鲜度语义（spec §5「食物随游戏时间腐坏」）应绑定 WorldClock：
-     * overworld 时钟随真实时间走、随 /time 跳变、随变速/暂停同步。
-     *
-     * @param level 任意维度（读取全局 overworld 时钟）
-     * @return overworld WorldClock 的 totalTicks
+     * <p>26.2 有两套独立计数器：{@code level.getGameTime()} 只随真实运行 tick
+     * 递增，不受 /time 影响；WorldClock（{@code getOverworldClockTime()}）才是
+     * /time add|set 操作、随变速/暂停同步的玩家可感知时间。新鲜度绑定后者——
+     * /time add 必须能加速腐坏。
      */
     public static long gameTime(Level level) {
         return level.getOverworldClockTime();
     }
 
-    /**
-     * 为所有食物物品的默认组件注入 bite:shelf_life。
-     *
-     * <p>Checkpoint 2 resolution (MC 26.2, Fabric API 0.158.0+26.2):
-     * {@link DefaultItemComponentEvents#MODIFY} 是 {@code Event<ModifyCallback>}，
-     * 回调接收 {@code ModifyContext}。使用重载
-     * {@code modify(Predicate<Item>, BiConsumer<DataComponentMap.Builder, Item>)}，
-     * BiConsumer 形参顺序为 (builder, item)。
-     */
+    /** 为所有食物的默认组件注入 bite:shelf_life（天数由 {@link ShelfLifeRegistry} 解析）。 */
     private static void registerDefaultShelfLife() {
         DefaultItemComponentEvents.MODIFY.register(context -> context.modify(
-            ShelfLifeRegistry::isFoodItemForDefaults,
+            ShelfLifeRegistry::isFood,
             (components, item) -> {
                 long ticks = ShelfLifeRegistry.resolveShelfLifeTicks(item);
                 if (ticks > 0) {
@@ -81,16 +73,7 @@ public class BiteMod implements ModInitializer {
             }));
     }
 
-    /**
-     * 给 loot 掉落物打标。
-     *
-     * <p>Checkpoint (MC 26.2, Fabric API 0.158.0+26.2):
-     * {@link LootTableEvents.ModifyDrops#modifyLootTableDrops} 签名为
-     * {@code (Holder<LootTable>, LootContext, List<ItemStack>)}，
-     * 非 brief 中的 {@code (ResourceKey, context, drops)}。
-     * 通过 {@link net.minecraft.world.level.storage.loot.LootContext#getLevel()}
-     * 取 ServerLevel 后再取 game time。
-     */
+    /** loot 掉落物生成时即打标。 */
     private static void registerLootDropStamping() {
         LootTableEvents.MODIFY_DROPS.register((tableHolder, context, drops) -> {
             long now = gameTime(context.getLevel());
@@ -100,12 +83,7 @@ public class BiteMod implements ModInitializer {
         });
     }
 
-    /**
-     * 懒扫描：每 {@code scanIntervalTicks} 刻扫描一次在线玩家背包、已加载区块容器、容器实体。
-     *
-     * <p>使用 {@link ServerTickEvents#END_LEVEL_TICK} 逐维度触发，门控条件：
-     * {@code level.getGameTime() % scanIntervalTicks == 0 && enabled}。
-     */
+    /** 懒扫描：按配置周期扫描玩家背包、已加载区块容器、容器实体与地面掉落物。 */
     private static void registerLazyScan() {
         ServerTickEvents.END_LEVEL_TICK.register(level -> {
             ServerConfig cfg = ServerConfig.get();
@@ -116,58 +94,20 @@ public class BiteMod implements ModInitializer {
         });
     }
 
-    /**
-     * 拦截变质食物的进食开始（spec §8 拦截）。
-     *
-     * <p>通过 {@link UseItemCallback#EVENT}（右键开始时触发）实现：
-     * <ul>
-     *   <li>配置 {@code spoiledInedible=false} → 一律 PASS（不拦截）</li>
-     *   <li>无 FRESHNESS 戳 / SHELF_LIFE 永不腐坏 → PASS（原版行为）</li>
-     *   <li>fraction &gt; 0（未完全变质）→ PASS</li>
-     *   <li>fraction ≤ 0（已变质）→ 服务端发送动作栏消息，返回 FAIL 阻止进食</li>
-     * </ul>
-     *
-     * <p>26.2 检查点：
-     * <ul>
-     *   <li>{@link UseItemCallback#interact} 签名 {@code (Player, Level, InteractionHand) -> InteractionResult}，
-     *       通过 javap 验证。</li>
-     *   <li>{@link InteractionResult#PASS} 让原版继续；{@link InteractionResult#FAIL} 阻止并触发挥手动画。</li>
-     *   <li>{@code Player.displayClientMessage} 在 26.2 已不存在——改用
-     *       {@link net.minecraft.server.level.ServerPlayer#sendOverlayMessage}（动作栏消息）。
-     *       服务端 player 必为 ServerPlayer，故 instanceof 守卫后调用。</li>
-     *   <li>lang key {@code bite.msg.spoiled_inedible} 由 Task 12 添加；缺失时显示原始 key，不影响功能。</li>
-     * </ul>
-     */
+    /** 已完全变质的食物禁食：动作栏提示 + FAIL 阻止进食（spec §8）。 */
     private static void registerSpoiledFoodBlock() {
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (!ServerConfig.get().spoiledInedible()) return InteractionResult.PASS;
             ItemStack stack = player.getItemInHand(hand);
             if (!isSpoiledInedible(stack, gameTime(level))) return InteractionResult.PASS;
-            if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.sendOverlayMessage(Component.translatable("bite.msg.spoiled_inedible"));
             }
             return InteractionResult.FAIL;
         });
     }
 
-    /**
-     * 变质禁食判定（包可见，供 gametest 直接调用）。
-     *
-     * <p>抽出为独立纯函数，使 UseItemCallback 回调与 gametest 共享同一决策逻辑：
-     * <ul>
-     *   <li>无 FRESHNESS 戳 → false（原版行为，未打标食物不受禁食约束）</li>
-     *   <li>无 SHELF_LIFE 或 spoilTicks ≤ 0 → false（永不腐坏豁免）</li>
-     *   <li>fraction &gt; 0（未完全变质）→ false</li>
-     *   <li>fraction ≤ 0（已完全变质）→ true（应阻止进食）</li>
-     * </ul>
-     *
-     * <p>实现记录（spec §8）：本判定仅作用于玩家进食路径（UseItemCallback / 玩家右键使用）。
-     * 生物进食（僵尸等）的 mob parity 延后至 v1.1。
-     *
-     * @param stack 待判定物品栈
-     * @param now   当前游戏刻（服务端权威时间）
-     * @return 若该栈已完全变质且应被禁食则返回 true
-     */
+    /** 变质禁食判定（独立纯函数，供回调与 gametest 共用）。 */
     public static boolean isSpoiledInedible(ItemStack stack, long now) {
         FreshnessStamp stamp = stack.get(BiteComponents.FRESHNESS);
         if (stamp == null) return false;

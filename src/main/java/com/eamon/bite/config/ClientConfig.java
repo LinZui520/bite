@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** 客户端显示配置。v1.0.8：删除半成品字段 showTooltip/tooltipStyle（解析了但渲染从未接线）。 */
+/** 客户端显示配置（config/bite/client.json）。 */
 public record ClientConfig(boolean showBar) {
     public static final ClientConfig DEFAULT = new ClientConfig(true);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();

@@ -14,23 +14,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 物品图标下的新鲜度进度条（spec §7.1）。
+ * 物品图标下的新鲜度进度条（spec §7.1）：注入 {@link ItemStack} 的
+ * isBarVisible / getBarWidth / getBarColor 三个方法 RETURN。
  *
- * <p>26.2 渲染路径（genSources/javap 验证）：{@link ItemStack#isBarVisible()}、
- * {@link ItemStack#getBarWidth()}、{@link ItemStack#getBarColor()} 三个实例方法仍保留在
- * {@link ItemStack} 上（内部委派给 {@code Item.isBarVisible/getBarWidth/getBarColor(ItemStack)}）。
- * 渲染由 {@code GuiGraphicsExtractor.itemBar(ItemStack, int, int)} 调用这三个方法绘制 13px 宽条。
- * 故采用方案 A：直接 {@code @Inject} 三个方法 {@code @At("RETURN")}。
- *
- * <p>语义：
- * <ul>
- *   <li>耐久条优先：{@code isBarVisible} 原版返回 true（即 {@link ItemStack#isDamaged()}）
- *       时早退，保留原版耐久条；{@code getBarWidth}/{@code getBarColor} 在 {@code isDamaged()}
- *       时早退，让原版值生效。</li>
- *   <li>否则当 stack 持有 {@code bite:freshness} 组件且客户端配置 {@code show_bar=true} 时，
- *       以新鲜度分数绘制：宽度 {@code round(13*fraction)}，颜色按 0.75/0.5/0.25/0.0 五档。</li>
- *   <li>已腐坏（fraction &le; 0）显示灰色满条，与 spec 一致。</li>
- * </ul>
+ * <p>耐久条优先：stack 受损时早退让原版值生效；否则持有 freshness 组件且
+ * 客户端配置开启时按 fraction 绘制：宽度 {@code round(13 × fraction)}，
+ * 颜色五档（绿/黄/橙/红，已腐坏为灰色满条）。
  */
 @Mixin(ItemStack.class)
 public abstract class ItemStackBarMixin {
