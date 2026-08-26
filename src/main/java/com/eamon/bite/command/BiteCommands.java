@@ -4,6 +4,7 @@ import com.eamon.bite.BiteMod;
 import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.component.ShelfLife;
+import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.freshness.FreshnessMath;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -71,7 +72,7 @@ public final class BiteCommands {
             source.sendSuccess(() -> Component.translatable("bite.cmd.freshness.never"), false);
         } else {
             source.sendSuccess(() -> Component.translatable("bite.cmd.freshness.life", life.spoilTicks() / 24000.0), false);
-            long now = BiteMod.gameTime(source.getLevel());
+            long now = FreshnessClock.now(source.getLevel());
             double fraction = stamp == null ? 1.0 : FreshnessMath.fraction(now, stamp, life);
             int pct = (int) Math.round(fraction * 100);
             source.sendSuccess(() -> Component.translatable("bite.cmd.freshness.fraction", pct), false);

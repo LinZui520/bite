@@ -67,7 +67,7 @@ public class FreshnessGameTests {
             return;
         }
 
-        long now = BiteMod.gameTime(level);
+        long now = FreshnessClock.now(level);
         for (ItemStack drop : drops) {
             FreshnessStamp stamp = drop.get(BiteComponents.FRESHNESS);
             if (stamp == null) {
@@ -132,7 +132,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void relaxedEqualityMergesDifferentStamps(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L; // bread 默认 6 天
         long staleAge = (long) (0.8 * shelfLifeTicks); // 80% 已过 → fraction 0.2
@@ -165,7 +165,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void relaxedEqualityDoesNotMergeDifferentItems(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L;
 
@@ -211,7 +211,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void mergeIsWeightedAverage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6; // bread 6 days
 
@@ -274,7 +274,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 80)
     public void hopperMergeIsWeightedAverage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         // 用远大于面包默认值的保质期：gametest 骨架在 thenExecuteAfter 等待期间
         // 会把世界快进数万至数十万 tick（实测一轮 7 游戏天，量级不稳定），
@@ -351,7 +351,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void relaxedEqualityDoesNotMergeSpoiled(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L;
         long spoiledAge = shelfLifeTicks + 1L; // 完全过期 → fraction 0
@@ -407,7 +407,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void staleFoodGivesReducedNutrition(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6; // bread 默认 6 天
 
@@ -445,7 +445,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void freshFoodGivesFullNutrition(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6;
 
@@ -487,7 +487,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void staleFoodAtFoodCapStillScalesSaturation(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6;
 
@@ -544,7 +544,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 20)
     public void spoiledInedibleDecision(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
+        FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long life = 24000L * 6; // bread 6 days
 
@@ -612,7 +612,7 @@ public class FreshnessGameTests {
      */
     @GameTest
     public void pickupOfUnstampedFoodMergesWithStamped(GameTestHelper helper) {
-        FreshnessClock.update(BiteMod.gameTime(helper.getLevel()));
+        FreshnessClock.update(FreshnessClock.now(helper.getLevel()));
         var player = helper.makeMockPlayer(GameType.SURVIVAL);
 
         // 背包里的：已被懒扫描打标（stamp + life）
@@ -642,7 +642,7 @@ public class FreshnessGameTests {
      * 26.2 时间体系重构后存在两个独立计数器 ——
      * levelData game time（旧）与 WorldClock totalTicks（新，/time add 操作它）。
      * 本测试用 ServerClockManager.addTicks 模拟 /time add，
-     * 断言游戏时钟读取口（BiteMod.gameTime）随之跳变。
+     * 断言游戏时钟读取口（FreshnessClock.now(Level)）随之跳变。
      * 若本测试失败而 addTicks 确实执行 → 读取口绑错计数器。
      */
     @GameTest
@@ -652,9 +652,9 @@ public class FreshnessGameTests {
             .lookupOrThrow(net.minecraft.core.registries.Registries.WORLD_CLOCK)
             .get(Identifier.fromNamespaceAndPath("minecraft", "overworld"))
             .orElseThrow();
-        long before = BiteMod.gameTime(helper.getLevel());
+        long before = FreshnessClock.now(helper.getLevel());
         server.clockManager().addTicks(overworldClock, 48000); // /time add 2d
-        long after = BiteMod.gameTime(helper.getLevel());
+        long after = FreshnessClock.now(helper.getLevel());
         if (after - before < 48000L) {
             helper.fail("根因证据：/time add 后游戏时钟仅前进 " + (after - before)
                 + " ticks（期望 ≥ 48000）—— 时间读取口绑在错误计数器上");
@@ -672,12 +672,12 @@ public class FreshnessGameTests {
         var level = helper.getLevel();
         ItemStack bread = new ItemStack(Items.BREAD);
         bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(24000L * 6));
-        FreshnessStamper.stamp(bread, BiteMod.gameTime(level));
+        FreshnessStamper.stamp(bread, FreshnessClock.now(level));
         if (bread.get(BiteComponents.FRESHNESS) == null) {
             helper.fail("前置失败：面包未被正确打标");
             return;
         }
-        double freshBefore = FreshnessMath.fraction(BiteMod.gameTime(level),
+        double freshBefore = FreshnessMath.fraction(FreshnessClock.now(level),
             bread.get(BiteComponents.FRESHNESS), bread.get(BiteComponents.SHELF_LIFE));
 
         level.getServer().clockManager().addTicks(
@@ -687,7 +687,7 @@ public class FreshnessGameTests {
                 .orElseThrow(),
             24000 * 5);
 
-        double freshAfter = FreshnessMath.fraction(BiteMod.gameTime(level),
+        double freshAfter = FreshnessMath.fraction(FreshnessClock.now(level),
             bread.get(BiteComponents.FRESHNESS), bread.get(BiteComponents.SHELF_LIFE));
         if (freshAfter >= freshBefore) {
             helper.fail(String.format(
@@ -719,7 +719,7 @@ public class FreshnessGameTests {
             helper.fail("chest block entity not created");
             return;
         }
-        long now = BiteMod.gameTime(level);
+        long now = FreshnessClock.now(level);
         long life = 24000L * 100;
 
         // 变质堆：stamp 早于保质期起点 → fraction = 0（3 块）
@@ -771,7 +771,7 @@ public class FreshnessGameTests {
     @GameTest
     public void cookingHalvesSpoilage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        long now = BiteMod.gameTime(level);
+        long now = FreshnessClock.now(level);
         long rawLife = 24000L * 3;  // 生鳕鱼 3 天（饥荒制 overrides）
 
         ItemStack rawCod = new ItemStack(Items.COD);
@@ -804,7 +804,7 @@ public class FreshnessGameTests {
     @GameTest
     public void craftingInheritsAverageSpoilage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        long now = BiteMod.gameTime(level);
+        long now = FreshnessClock.now(level);
         long wheatLife = 24000L * 40; // 种子/谷物参照长寿命
 
         java.util.List<ItemStack> ingredients = new java.util.ArrayList<>();
@@ -857,7 +857,7 @@ public class FreshnessGameTests {
     @GameTest(maxTicks = 200)
     public void groundItemsGetStampedAndConverted(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        long now = BiteMod.gameTime(level);
+        long now = FreshnessClock.now(level);
         long life = 24000L * 100;
 
         var freshEntity = helper.spawnItem(Items.BREAD, new BlockPos(1, 2, 1));

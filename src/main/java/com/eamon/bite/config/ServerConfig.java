@@ -2,10 +2,7 @@ package com.eamon.bite.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.eamon.bite.BiteMod;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -128,19 +125,8 @@ public record ServerConfig(
 
     /** 从 config/bite/server.json 加载；文件缺失时写默认值。 */
     public static ServerConfig load(Path configDir) {
-        Path file = configDir.resolve("bite").resolve("server.json");
-        try {
-            if (Files.exists(file)) {
-                instance = fromJson(Files.readString(file));
-            } else {
-                Files.createDirectories(file.getParent());
-                Files.writeString(file, DEFAULT.toJson());
-                instance = DEFAULT;
-            }
-        } catch (IOException e) {
-            BiteMod.LOGGER.error("Failed to load server config, using defaults", e);
-            instance = DEFAULT;
-        }
+        String json = ConfigFiles.readOrCreate(configDir, "server.json", DEFAULT.toJson());
+        instance = json == null ? DEFAULT : fromJson(json);
         return instance;
     }
 

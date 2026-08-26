@@ -2,10 +2,7 @@ package com.eamon.bite.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.eamon.bite.BiteMod;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 /** 客户端显示配置（config/bite/client.json）。 */
@@ -30,19 +27,8 @@ public record ClientConfig(boolean showBar) {
     }
 
     public static ClientConfig load(Path configDir) {
-        Path file = configDir.resolve("bite").resolve("client.json");
-        try {
-            if (Files.exists(file)) {
-                instance = fromJson(Files.readString(file));
-            } else {
-                Files.createDirectories(file.getParent());
-                Files.writeString(file, DEFAULT.toJson());
-                instance = DEFAULT;
-            }
-        } catch (IOException e) {
-            BiteMod.LOGGER.error("Failed to load client config, using defaults", e);
-            instance = DEFAULT;
-        }
+        String json = ConfigFiles.readOrCreate(configDir, "client.json", DEFAULT.toJson());
+        instance = json == null ? DEFAULT : fromJson(json);
         return instance;
     }
 

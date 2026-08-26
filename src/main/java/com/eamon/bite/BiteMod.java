@@ -23,7 +23,6 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,20 +44,8 @@ public class BiteMod implements ModInitializer {
         // 无 Level 上下文的静态钩子（合并重算、客户端渲染）读 FreshnessClock，
         // 每 tick 用主世界时钟刷新它（客户端侧由 BiteModClient 刷新）。
         ServerTickEvents.END_SERVER_TICK.register(server ->
-            FreshnessClock.update(gameTime(server.overworld())));
+            FreshnessClock.update(FreshnessClock.now(server.overworld())));
         LOGGER.info("Because It's Too Easy initialized");
-    }
-
-    /**
-     * 游戏时钟统一读取口。
-     *
-     * <p>26.2 有两套独立计数器：{@code level.getGameTime()} 只随真实运行 tick
-     * 递增，不受 /time 影响；WorldClock（{@code getOverworldClockTime()}）才是
-     * /time add|set 操作、随变速/暂停同步的玩家可感知时间。新鲜度绑定后者——
-     * /time add 必须能加速腐坏。
-     */
-    public static long gameTime(Level level) {
-        return level.getOverworldClockTime();
     }
 
     /** 为所有食物的默认组件注入 bite:shelf_life（天数由 {@link ShelfLifeRegistry} 解析）。 */
@@ -76,7 +63,7 @@ public class BiteMod implements ModInitializer {
     /** loot 掉落物生成时即打标。 */
     private static void registerLootDropStamping() {
         LootTableEvents.MODIFY_DROPS.register((tableHolder, context, drops) -> {
-            long now = gameTime(context.getLevel());
+            long now = FreshnessClock.now(context.getLevel());
             for (ItemStack drop : drops) {
                 FreshnessStamper.stamp(drop, now);
             }
@@ -90,7 +77,7 @@ public class BiteMod implements ModInitializer {
             if (!cfg.enabled()) return;
             if (cfg.scanIntervalTicks() <= 0) return;
             if (level.getGameTime() % cfg.scanIntervalTicks() != 0) return;
-            FreshnessScanner.scanLevel(level, gameTime(level));
+            FreshnessScanner.scanLevel(level, FreshnessClock.now(level));
         });
     }
 
@@ -99,7 +86,7 @@ public class BiteMod implements ModInitializer {
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (!ServerConfig.get().spoiledInedible()) return InteractionResult.PASS;
             ItemStack stack = player.getItemInHand(hand);
-            if (!isSpoiledInedible(stack, gameTime(level))) return InteractionResult.PASS;
+            if (!isSpoiledInedible(stack, FreshnessClock.now(level))) return InteractionResult.PASS;
             if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.sendOverlayMessage(Component.translatable("bite.msg.spoiled_inedible"));
             }
