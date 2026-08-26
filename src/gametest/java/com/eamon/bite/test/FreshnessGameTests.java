@@ -676,7 +676,6 @@ public class FreshnessGameTests {
     @GameTest
     public void timeAddSpoilsFood(GameTestHelper helper) {
         var level = helper.getLevel();
-        FreshnessClock.update(BiteMod.gameTime(level));
         ItemStack bread = new ItemStack(Items.BREAD);
         bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(24000L * 6));
         FreshnessStamper.stamp(bread, BiteMod.gameTime(level));
@@ -727,7 +726,6 @@ public class FreshnessGameTests {
             return;
         }
         long now = BiteMod.gameTime(level);
-        FreshnessClock.update(now);
         long life = 24000L * 100;
 
         // 变质堆：stamp 早于保质期起点 → fraction = 0（3 块）
@@ -772,19 +770,16 @@ public class FreshnessGameTests {
      * 生鳕鱼（保质期 3 天，饥荒制）半腐坏（fraction 0.5）时烤制，
      * 产物熟鳕鱼（保质期 6 天）应继承一半腐坏量 → fraction 0.75。
      *
-     * <p>真实链路：熔炉放入半腐生鳕鱼+煤 → 等待烹饪完成（默认 100t+余量）
-     * → 断言产物熟鳕鱼的 FRESHNESS 换算 fraction ≈ 0.75。
-     * gametest 骨架等待期世界快进不定，断言用「产物腐坏量 = 原料腐坏量一半」
-     * 的相对关系（以断言时刻的时钟重算双方 fraction）。
+     * <p>纯函数验证（直接调 stampCooked）。真实熔炉链路（burn mixin 的应用）
+     * 由 gametest 服务端启动无 crash 间接保证——gametest 骨架里熔炉 ticker
+     * 驱动不可靠（曾实测不触发），不适合端到端断言。
      */
-    @GameTest(maxTicks = 400)
+    @GameTest
     public void cookingHalvesSpoilage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         long now = BiteMod.gameTime(level);
-        FreshnessClock.update(now);
         long rawLife = 24000L * 3;  // 生鳕鱼 3 天（饥荒制 overrides）
 
-        // 第一段：stampCooked 纯逻辑验证（不依赖熔炉 tick）
         ItemStack rawCod = new ItemStack(Items.COD);
         rawCod.set(BiteComponents.SHELF_LIFE, new ShelfLife(rawLife));
         rawCod.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - rawLife / 2)); // fraction 0.5
@@ -802,9 +797,6 @@ public class FreshnessGameTests {
             helper.fail("烹饪应刷新一半腐坏：期望产物 fraction 0.75，实际 " + actual);
             return;
         }
-
-        // 第二段：真实熔炉链路 —— burn mixin 应用（mixin 应用失败会在启动时崩溃，
-        // build 通过 + 无 crash 即证明 mixin 生效；产物继承语义已由第一段覆盖）
         helper.succeed();
     }
 
@@ -819,7 +811,6 @@ public class FreshnessGameTests {
     public void craftingInheritsAverageSpoilage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         long now = BiteMod.gameTime(level);
-        FreshnessClock.update(now);
         long wheatLife = 24000L * 40; // 种子/谷物参照长寿命
 
         java.util.List<ItemStack> ingredients = new java.util.ArrayList<>();
@@ -873,7 +864,6 @@ public class FreshnessGameTests {
     public void groundItemsGetStampedAndConverted(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         long now = BiteMod.gameTime(level);
-        FreshnessClock.update(now);
         long life = 24000L * 100;
 
         var freshEntity = helper.spawnItem(Items.BREAD, new BlockPos(1, 2, 1));

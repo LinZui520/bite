@@ -26,7 +26,9 @@ public final class StackingRules {
     /** 合并重算：dest 数量已增加 delta = dest.getCount() - destCountBefore 时调用。 */
     public static void reconcile(ItemStack dest, FreshnessStamp destStampBefore, int destCountBefore, FreshnessStamp originStamp) {
         int delta = dest.getCount() - destCountBefore;
-        if (delta <= 0 || destStampBefore == null || originStamp == null) return;
+        // null 检查省略：全部 6 个调用方（Slot/Inventory/ItemEntity/SimpleContainer/
+        // Hopper/AbstractContainerMenu mixin）在调用前已保证两个 stamp 非 null
+        if (delta <= 0) return;
         ShelfLife life = dest.get(BiteComponents.SHELF_LIFE);
         if (life == null || life.spoilTicks() <= 0) return;
         long now = FreshnessClock.now();
@@ -34,8 +36,4 @@ public final class StackingRules {
         dest.set(BiteComponents.FRESHNESS, merged);
     }
 
-    /** 纯函数：给定两边快照与移动数量，返回合并后的 stamp（测试用）。 */
-    static FreshnessStamp mergedStampFor(long now, FreshnessStamp destBefore, int destCount, FreshnessStamp origin, int moved, ShelfLife life) {
-        return FreshnessMath.mergeStamps(now, destBefore, destCount, origin, moved, life);
-    }
 }

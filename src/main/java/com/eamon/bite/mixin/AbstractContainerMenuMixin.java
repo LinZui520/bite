@@ -3,7 +3,6 @@ package com.eamon.bite.mixin;
 import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.freshness.StackingRules;
-import net.minecraft.core.NonNullList;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;

@@ -62,7 +62,7 @@ public final class ShelfLifeRegistry {
      * 返回物品所属的 c:foods 分类（调试用）。
      * 顺序按 {@link #CATEGORIES}，未命中返回 "default"。
      */
-    public static String categoryOf(Item item) {
+    private static String categoryOf(Item item) {
         for (String cat : CATEGORIES) {
             TagKey<Item> tag = TagKey.create(Registries.ITEM,
                 Identifier.fromNamespaceAndPath("c", "foods/" + cat));

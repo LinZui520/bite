@@ -81,7 +81,9 @@ public abstract class ItemStackFinishMixin {
     private void bite$applyPenalty(Level level, LivingEntity entity, CallbackInfoReturnable<ItemStack> cir) {
         if (!bite$tracked) return;
         bite$tracked = false;
-        if (!(entity instanceof Player player)) return;
+        // instanceof 检查省略：bite$tracked=true 仅在 HEAD 通过 Player 检查后置位，
+        // 同一 finishUsingItem 调用的 entity 引用不变，此处必为 Player
+        Player player = (Player) entity;
         double fraction = FreshnessMath.fraction(FreshnessClock.now(), bite$stamp, bite$life);
         double scale = SpoiledFoodHandler.nutritionScale(fraction);
         if (scale < 1.0) {

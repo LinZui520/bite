@@ -14,7 +14,7 @@ class StackingRulesTest {
         long now = 5000;
         FreshnessStamp destBefore = new FreshnessStamp(now - 100);       // 0.9
         FreshnessStamp origin = new FreshnessStamp(now - 900);           // 0.1
-        FreshnessStamp merged = StackingRules.mergedStampFor(now, destBefore, 3, origin, 2, LIFE);
+        FreshnessStamp merged = FreshnessMath.mergeStamps(now, destBefore, 3, origin, 2, LIFE);
         double expected = (0.9 * 3 + 0.1 * 2) / 5.0;
         assertEquals(expected, FreshnessMath.fraction(now, merged, LIFE), 1e-6);
     }
