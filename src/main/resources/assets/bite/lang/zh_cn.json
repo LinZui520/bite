@@ -1,9 +1,5 @@
 {
-  "bite.tooltip.freshness": "新鲜度：%1$s%%（%2$s）",
-  "bite.tooltip.spoiled": "已变质",
   "bite.msg.spoiled_inedible": "这食物已经变质了，不能吃。",
-  "bite.time.days": "约 %1$s 天",
-  "bite.time.hours": "约 %1$s 小时",
   "bite.cmd.freshness.header": "%1$s 的新鲜度报告",
   "bite.cmd.freshness.no_food": "手持食物后再查询。",
   "bite.cmd.freshness.stamp": "生产于第 %1$s 刻",

@@ -1,9 +1,5 @@
 {
-  "bite.tooltip.freshness": "Freshness: %1$s%% (%2$s)",
-  "bite.tooltip.spoiled": "Spoiled",
   "bite.msg.spoiled_inedible": "This food has spoiled and can't be eaten.",
-  "bite.time.days": "~%1$s days",
-  "bite.time.hours": "~%1$s hours",
   "bite.cmd.freshness.header": "Freshness report for %1$s",
   "bite.cmd.freshness.no_food": "Hold a food item to inspect it.",
   "bite.cmd.freshness.stamp": "Created at tick %1$s",
