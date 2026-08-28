@@ -25,7 +25,9 @@ public record ServerConfig(
     String spoiledResult,
     double hungerMetabolismPerTick,
     double hungerSleepMetabolismFactor,
-    double hungerActionMultiplier
+    double hungerActionMultiplier,
+    double perishWinterMultiplier,
+    double perishSummerMultiplier
 ) {
     public static final ServerConfig DEFAULT = createDefault();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
@@ -79,8 +81,9 @@ public record ServerConfig(
             0.5, 0.2, 0.75, 0.5, 0.3, 160, true,
             true, "bite:rotten_organic",
             // 饿腹代谢半档：2 游戏日 20→0（满档 FULL_DAY_RATE = 1 日）；
-            // 睡觉代谢 40%；动作疲劳 ×1.3（疾跑 0.1→0.13/米）
-            0.00208, 0.4, 1.3);
+            // 睡觉代谢 40%；动作疲劳 ×1.3（疾跑 0.1→0.13/米）；
+            // 季节腐坏（DST perishable.lua 口径）：冬 ×0.75 / 夏 ×1.25
+            0.00208, 0.4, 1.3, 0.75, 1.25);
     }
 
     public static ServerConfig fromJson(String json) {
@@ -112,7 +115,9 @@ public record ServerConfig(
             orDefault(raw.spoiled_result, d.spoiledResult),
             orDefault(raw.hunger_metabolism_per_tick, d.hungerMetabolismPerTick),
             orDefault(raw.hunger_sleep_metabolism_factor, d.hungerSleepMetabolismFactor),
-            orDefault(raw.hunger_action_multiplier, d.hungerActionMultiplier));
+            orDefault(raw.hunger_action_multiplier, d.hungerActionMultiplier),
+            orDefault(raw.perish_winter_multiplier, d.perishWinterMultiplier),
+            orDefault(raw.perish_summer_multiplier, d.perishSummerMultiplier));
     }
 
     private static int orDefault(Integer v, int d) { return v == null ? d : v; }
@@ -132,6 +137,8 @@ public record ServerConfig(
         raw.hunger_metabolism_per_tick = hungerMetabolismPerTick;
         raw.hunger_sleep_metabolism_factor = hungerSleepMetabolismFactor;
         raw.hunger_action_multiplier = hungerActionMultiplier;
+        raw.perish_winter_multiplier = perishWinterMultiplier;
+        raw.perish_summer_multiplier = perishSummerMultiplier;
         return GSON.toJson(raw);
     }
 
@@ -164,5 +171,8 @@ public record ServerConfig(
         Double hunger_metabolism_per_tick;
         Double hunger_sleep_metabolism_factor;
         Double hunger_action_multiplier;
+        // 季节腐坏系数（DST 口径：冬 0.75 / 夏 1.25；1 = 无季节影响）
+        Double perish_winter_multiplier;
+        Double perish_summer_multiplier;
     }
 }

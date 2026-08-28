@@ -46,6 +46,11 @@ import java.util.List;
  */
 public class FreshnessGameTests {
 
+    /** 变质构造辅助：年龄按季节腐坏系数反向放大，保证任何季节下 fraction ≤ 0。 */
+    private static long spoiledAge() {
+        return Long.MAX_VALUE / 4; // 保守极大年龄：任何系数下都完全变质
+    }
+
     @GameTest
     public void lootDropsGetStamped(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -134,7 +139,9 @@ public class FreshnessGameTests {
         FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L; // bread 默认 6 天
-        long staleAge = (long) (0.8 * shelfLifeTicks); // 80% 已过 → fraction 0.2
+        // 80% 已过 → fraction 0.2；年龄按季节系数反向放大（夏季不越界成 spoiled）
+        double kRelax = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        long staleAge = (long) (0.8 * shelfLifeTicks / kRelax);
 
         ItemStack fresh = new ItemStack(Items.BREAD);
         fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
@@ -216,17 +223,20 @@ public class FreshnessGameTests {
 
         ItemStack stale = new ItemStack(Items.BREAD, 3);
         stale.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
-        stale.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.9))); // fraction 0.1
 
         ItemStack fresh = new ItemStack(Items.BREAD, 1);
         fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
         fresh.set(BiteComponents.FRESHNESS, new FreshnessStamp(now)); // fraction 1.0
 
-        // 预检：分数符合预期，避免 setup 误差被误判为 mixin bug
+        // 预检：分数符合预期，避免 setup 误差被误判为 mixin bug。
+        // stale 年龄按季节系数反向放大（fraction 恒 0.1，夏季不越界成 spoiled）
+        double k = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        stale.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.9 / k)));
+        double expectStale = 0.1;
         double fStale = FreshnessMath.fraction(now, stale.get(BiteComponents.FRESHNESS), stale.get(BiteComponents.SHELF_LIFE));
         double fFresh = FreshnessMath.fraction(now, fresh.get(BiteComponents.FRESHNESS), fresh.get(BiteComponents.SHELF_LIFE));
-        if (Math.abs(fStale - 0.1) > 0.001 || Math.abs(fFresh - 1.0) > 0.001) {
-            helper.fail("test setup invariant violated: fStale=" + fStale + " fFresh=" + fFresh);
+        if (Math.abs(fStale - expectStale) > 0.001 || Math.abs(fFresh - 1.0) > 0.001) {
+            helper.fail("test setup invariant violated: fStale=" + fStale + " expect=" + expectStale + " fFresh=" + fFresh);
             return;
         }
 
@@ -244,7 +254,8 @@ public class FreshnessGameTests {
             helper.fail("merged stack missing FRESHNESS component");
             return;
         }
-        double expected = (0.1 * 3 + 1.0 * 1) / 4.0; // 0.325
+        // 期望 = 预检折算后的 fStale 与 1.0 的加权平均（与季节系数同源）
+        double expected = (expectStale * 3 + 1.0 * 1) / 4.0;
         double actual = FreshnessMath.fraction(now, stamp, new ShelfLife(life));
         if (Math.abs(expected - actual) > 0.01) {
             helper.fail("merged freshness " + actual + " != expected " + expected + " (±0.01 tolerance)");
@@ -353,7 +364,10 @@ public class FreshnessGameTests {
         FreshnessClock.update(FreshnessClock.now(level));
         long now = FreshnessClock.now();
         long shelfLifeTicks = 6L * 24000L;
-        long spoiledAge = shelfLifeTicks + 1L; // 完全过期 → fraction 0
+        // 完全过期 → fraction 0：年龄按季节系数反向放大（夏 1.25 时 1 倍寿命
+        // 不足以归零——gametest 骨架快进会换季），保证任何季节下都构造出 SPOILED
+        double k = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        long spoiledAge = (long) (shelfLifeTicks / k) + 1L;
 
         ItemStack fresh = new ItemStack(Items.BREAD);
         fresh.set(BiteComponents.SHELF_LIFE, new ShelfLife(shelfLifeTicks));
@@ -415,7 +429,9 @@ public class FreshnessGameTests {
 
         ItemStack bread = new ItemStack(Items.BREAD);
         bread.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
-        bread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.6))); // 40% → STALE → 75% 营养
+        // 年龄按季节系数反向放大，保证任何季节下 fraction 恒为 0.4
+        double k = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        bread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.6 / k))); // → fraction 0.4 → STALE → 75% 营养
 
         // 预检：fraction 确为 0.4，避免 setup 误差
         double fraction = FreshnessMath.fraction(now,
@@ -504,13 +520,15 @@ public class FreshnessGameTests {
             return;
         }
 
-        // 治疗组：food=20 吃 STALE 面包（fraction 0.4 → scale 0.75）
+        // 治疗组：food=20 吃 STALE 面包（fraction 0.4 → scale 0.75；
+        // 年龄按季节系数反向放大，保证任何季节下 fraction 恒 0.4）
         net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         player.getFoodData().setFoodLevel(20);
         float satBefore = player.getFoodData().getSaturationLevel();
         ItemStack staleBread = new ItemStack(Items.BREAD);
         staleBread.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
-        staleBread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.6)));
+        double kSat = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        staleBread.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (life * 0.6 / kSat)));
         staleBread.finishUsingItem(level, player);
 
         if (player.getFoodData().getFoodLevel() != 20) {
@@ -550,7 +568,7 @@ public class FreshnessGameTests {
         // (1) spoiled: stamp older than shelf life → fraction 0
         ItemStack spoiled = new ItemStack(Items.BREAD);
         spoiled.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
-        spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1L));
+        spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - spoiledAge()));
         if (!FreshnessMath.isSpoiled(spoiled, now)) {
             helper.fail("spoiled food (fraction 0) should be inedible → true");
             return;
@@ -575,7 +593,7 @@ public class FreshnessGameTests {
         // (4) never-spoil: SHELF_LIFE spoilTicks <= 0
         ItemStack neverSpoil = new ItemStack(Items.BREAD);
         neverSpoil.set(BiteComponents.SHELF_LIFE, new ShelfLife(-1L));
-        neverSpoil.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1L));
+        neverSpoil.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - spoiledAge()));
         if (FreshnessMath.isSpoiled(neverSpoil, now)) {
             helper.fail("never-spoil food (spoilTicks <= 0) should not be inedible → false");
             return;
@@ -694,9 +712,12 @@ public class FreshnessGameTests {
                 freshBefore, freshAfter));
             return;
         }
-        // 5/6 天过去 → ~16.7%
-        if (Math.abs(freshAfter - (1.0 - 5.0 / 6.0)) > 0.01) {
-            helper.fail("快进 5/6 保质期后新鲜度应为 ~0.167，实际 " + freshAfter);
+        // 5/6 天过去 → ~16.7%（季节系数折算流逝时间，夏 1.25/冬 0.75 时
+        // 期望值随之缩放）
+        double kTime = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        double expected = Math.clamp(1.0 - 5.0 / 6.0 * kTime, 0.0, 1.0);
+        if (Math.abs(freshAfter - expected) > 0.01) {
+            helper.fail("快进 5/6 保质期后新鲜度应为 ~" + expected + "，实际 " + freshAfter);
             return;
         }
         helper.succeed();
@@ -724,7 +745,7 @@ public class FreshnessGameTests {
         // 变质堆：stamp 早于保质期起点 → fraction = 0（3 块）
         ItemStack spoiled = new ItemStack(Items.BREAD, 3);
         spoiled.set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
-        spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1));
+        spoiled.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - spoiledAge()));
         chest.setItem(0, spoiled);
 
         // 新鲜堆：fraction = 1（2 块）
@@ -766,7 +787,9 @@ public class FreshnessGameTests {
 
         ItemStack rawCod = new ItemStack(Items.COD);
         rawCod.set(BiteComponents.SHELF_LIFE, new ShelfLife(rawLife));
-        rawCod.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - rawLife / 2)); // fraction 0.5
+        // 原料 fraction 恒 0.5：年龄按季节系数反向放大
+        double kCook = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        rawCod.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (rawLife / 2 / kCook)));
         ItemStack cooked = new ItemStack(Items.COOKED_COD);
         cooked.set(BiteComponents.SHELF_LIFE, new ShelfLife(24000L * 6)); // 熟鳕鱼 6 天
         com.eamon.bite.freshness.FreshnessStamper.stampCooked(cooked, rawCod, now);
@@ -776,9 +799,11 @@ public class FreshnessGameTests {
             return;
         }
         // 原料 fraction 0.5 → 产物腐坏量为产物寿命一半的一半（25%）→ fraction 0.75
+        // （stampCooked 经 fraction 读到 0.5 后写 stamp；断言侧同季节系数换算）
         double actual = FreshnessMath.fraction(now, stamp, new ShelfLife(24000L * 6));
-        if (Math.abs(actual - 0.75) > 0.01) {
-            helper.fail("烹饪应刷新一半腐坏：期望产物 fraction 0.75，实际 " + actual);
+        double expectedCook = 1.0 - 0.25 * kCook;
+        if (Math.abs(actual - expectedCook) > 0.01) {
+            helper.fail("烹饪应刷新一半腐坏：期望产物 fraction " + expectedCook + "，实际 " + actual);
             return;
         }
         helper.succeed();
@@ -806,7 +831,9 @@ public class FreshnessGameTests {
         }
         ItemStack half = new ItemStack(Items.WHEAT);
         half.set(BiteComponents.SHELF_LIFE, new ShelfLife(wheatLife));
-        half.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - wheatLife / 2)); // fraction 0.5
+        // fraction 恒 0.5：年龄按季节系数反向放大
+        double kCraft = FreshnessMath.perishMultiplier(com.eamon.bite.season.SeasonClock.current());
+        half.set(BiteComponents.FRESHNESS, new FreshnessStamp(now - (long) (wheatLife / 2 / kCraft)));
         ingredients.add(half);
 
         ItemStack bread = new ItemStack(Items.BREAD);
@@ -820,8 +847,10 @@ public class FreshnessGameTests {
         }
         double actual = FreshnessMath.fraction(now, stamp, new ShelfLife(24000L * 15));
         // 平均腐坏 (0+0+0.5)/3 = 1/6；减半 = 1/12 → fraction 11/12 ≈ 0.9167
-        if (Math.abs(actual - 11.0 / 12.0) > 0.01) {
-            helper.fail("合成应继承平均腐坏减半：期望 fraction " + (11.0 / 12.0)
+        // （断言侧同季节系数换算）
+        double expectedCraft = Math.clamp(1.0 - (1.0 / 12.0) * kCraft, 0.0, 1.0);
+        if (Math.abs(actual - expectedCraft) > 0.01) {
+            helper.fail("合成应继承平均腐坏减半：期望 fraction " + expectedCraft
                 + "，实际 " + actual);
             return;
         }
@@ -854,7 +883,7 @@ public class FreshnessGameTests {
         var spoiledEntity = helper.spawnItem(Items.BREAD, new BlockPos(1, 2, 2));
         // spawnItem 的实体自带全新单个 stack；改写成变质状态
         spoiledEntity.getItem().set(BiteComponents.SHELF_LIFE, new ShelfLife(life));
-        spoiledEntity.getItem().set(BiteComponents.FRESHNESS, new FreshnessStamp(now - life - 1));
+        spoiledEntity.getItem().set(BiteComponents.FRESHNESS, new FreshnessStamp(now - spoiledAge()));
 
         int interval = ServerConfig.get().scanIntervalTicks();
         helper.startSequence()
