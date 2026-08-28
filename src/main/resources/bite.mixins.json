@@ -16,7 +16,11 @@
     "BiomeMixin",
     "BiomeTemperatureCacheAccess",
     "SnowLayerBlockMixin",
-    "IceBlockMixin"
+    "IceBlockMixin",
+    "ServerLevelSleepMixin",
+    "ServerPlayerMovementMixin",
+    "PlayerAttackExhaustionMixin",
+    "FoodDataExhaustionAccess"
   ],
   "injectors": {
     "defaultRequire": 1

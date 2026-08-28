@@ -4,6 +4,7 @@ import com.eamon.bite.command.BiteCommands;
 import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.ShelfLife;
 import com.eamon.bite.config.ServerConfig;
+import com.eamon.bite.hunger.HungerMetabolism;
 import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.freshness.FreshnessMath;
 import com.eamon.bite.freshness.FreshnessScanner;
@@ -44,11 +45,13 @@ public class BiteMod implements ModInitializer {
         BiteCommands.register();
         // 无 Level 上下文的静态钩子（合并重算、客户端渲染、季节温度）读
         // FreshnessClock / SeasonClock，每 tick 用主世界时钟刷新它们
-        // （客户端侧由 BiteModClient 刷新）。同一 tick 驱动季节天气。
+        // （客户端侧由 BiteModClient 刷新）。同一 tick 驱动季节天气
+        // 与饿腹代谢（站桩/走路也掉饥饿，睡觉补结算由 SleepMixin 触发）。
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             FreshnessClock.update(FreshnessClock.now(server.overworld()));
             SeasonClock.update(server.overworld());
             SeasonWeatherController.tick(server, server.overworld());
+            HungerMetabolism.tick(server.getPlayerList().getPlayers());
         });
         LOGGER.info("Because It's Too Easy initialized");
     }

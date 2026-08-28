@@ -39,8 +39,6 @@ public final class SeasonHud {
             return;
         }
         long day = SeasonClock.dayOfWorld(client.level);
-        com.eamon.bite.BiteMod.LOGGER.info("[bite-season] day={} lastDay={} firstObs={}",
-            day, lastDay, firstObservation);
         if (lastDay == Long.MIN_VALUE) {
             boolean announce = firstObservation;
             firstObservation = false;

@@ -22,7 +22,10 @@ public record ServerConfig(
     int hungerEffectDurationTicks,
     boolean spoiledInedible,
     boolean spoiledConversion,
-    String spoiledResult
+    String spoiledResult,
+    double hungerMetabolismPerTick,
+    double hungerSleepMetabolismFactor,
+    double hungerActionMultiplier
 ) {
     public static final ServerConfig DEFAULT = createDefault();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
@@ -74,7 +77,10 @@ public record ServerConfig(
         overrides.put("minecraft:pitcher_seeds", 40);
         return new ServerConfig(true, 20, shelf, overrides,
             0.5, 0.2, 0.75, 0.5, 0.3, 160, true,
-            true, "bite:rotten_organic");
+            true, "bite:rotten_organic",
+            // 饿腹代谢半档：2 游戏日 20→0（满档 FULL_DAY_RATE = 1 日）；
+            // 睡觉代谢 40%；动作疲劳 ×1.3（疾跑 0.1→0.13/米）
+            0.00208, 0.4, 1.3);
     }
 
     public static ServerConfig fromJson(String json) {
@@ -103,7 +109,10 @@ public record ServerConfig(
             orDefault(raw.hunger_effect_duration_ticks, d.hungerEffectDurationTicks),
             orDefault(raw.spoiled_inedible, d.spoiledInedible),
             orDefault(raw.spoiled_conversion, d.spoiledConversion),
-            orDefault(raw.spoiled_result, d.spoiledResult));
+            orDefault(raw.spoiled_result, d.spoiledResult),
+            orDefault(raw.hunger_metabolism_per_tick, d.hungerMetabolismPerTick),
+            orDefault(raw.hunger_sleep_metabolism_factor, d.hungerSleepMetabolismFactor),
+            orDefault(raw.hunger_action_multiplier, d.hungerActionMultiplier));
     }
 
     private static int orDefault(Integer v, int d) { return v == null ? d : v; }
@@ -120,6 +129,9 @@ public record ServerConfig(
         raw.hunger_effect_chance = hungerEffectChance; raw.hunger_effect_duration_ticks = hungerEffectDurationTicks;
         raw.spoiled_inedible = spoiledInedible;
         raw.spoiled_conversion = spoiledConversion; raw.spoiled_result = spoiledResult;
+        raw.hunger_metabolism_per_tick = hungerMetabolismPerTick;
+        raw.hunger_sleep_metabolism_factor = hungerSleepMetabolismFactor;
+        raw.hunger_action_multiplier = hungerActionMultiplier;
         return GSON.toJson(raw);
     }
 
@@ -147,5 +159,10 @@ public record ServerConfig(
         // spoiled_result；转换暂缓后该键暂未读取，保留以备恢复）
         Boolean spoiled_conversion;
         String spoiled_result;
+        // 饥饿代谢：每 tick 疲劳（0 = 关闭，站桩不掉）；睡觉期间代谢系数
+        // （0.4 = 睡觉消耗为清醒的 40%）；动作疲劳乘数（1 = 原版，>1 更快饿）
+        Double hunger_metabolism_per_tick;
+        Double hunger_sleep_metabolism_factor;
+        Double hunger_action_multiplier;
     }
 }
