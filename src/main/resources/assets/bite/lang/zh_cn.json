@@ -9,5 +9,10 @@
   "modmenu.nameTranslation.bite": "Because It's Too Easy（生存哪有这么容易）",
   "modmenu.summaryTranslation.bite": "食物腐坏生存机制",
   "modmenu.descriptionTranslation.bite": "食物随时间腐坏，堆叠按加权平均新鲜度合并，吃不新鲜的东西会吃苦头。生存模式太容易了。",
-  "item.bite.rotten_organic": "腐烂物"
+  "item.bite.rotten_organic": "腐烂物",
+  "bite.season.title": "%1$s%2$s",
+  "bite.season.autumn": "秋",
+  "bite.season.winter": "冬",
+  "bite.season.spring": "春",
+  "bite.season.summer": "夏"
 }

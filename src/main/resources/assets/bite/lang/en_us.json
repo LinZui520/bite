@@ -9,5 +9,10 @@
   "modmenu.nameTranslation.bite": "Because It's Too Easy",
   "modmenu.summaryTranslation.bite": "Food spoilage survival mechanics",
   "modmenu.descriptionTranslation.bite": "Food spoils over time, merges by weighted-average freshness, and stale meals bite back. Survival was too easy.",
-  "item.bite.rotten_organic": "Rotten Organic"
+  "item.bite.rotten_organic": "Rotten Organic",
+  "bite.season.title": "%1$s %2$s",
+  "bite.season.autumn": "Autumn",
+  "bite.season.winter": "Winter",
+  "bite.season.spring": "Spring",
+  "bite.season.summer": "Summer"
 }
