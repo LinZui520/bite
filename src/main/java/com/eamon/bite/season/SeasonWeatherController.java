@@ -7,35 +7,41 @@ import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.level.saveddata.WeatherData;
 
 /**
- * 季节天气控制器：按季节调整原版天气循环。
+ * 季节天气控制器：按季节重排原版天气循环的间隔（节奏对齐饥荒 DST
+ * 一手数据，2026-08-29 调研：weather.lua 常量 + 200 游戏年模拟）。
  *
- * <p>实现方式（26.2 事实）：天气循环在 {@code ServerLevel.advanceWeatherCycle}
- * 中驱动，状态存于 <b>server 级</b> {@link WeatherData}（overworld 语义）；
- * 雨停时原版从 {@code RAIN_DELAY = UniformInt(12000, 180000)} 采样下一场雨
- * 的间隔。本控制器不 mixin 原版循环，而是在「雨刚停、采样即将发生前」
- * 用 {@link MinecraftServer#setWeatherParameters} 按季节重写下一段：
+ * <p>实现方式：天气状态在 server 级 {@link WeatherData}（overworld 语义），
+ * 不 mixin 原版循环——只在「降水刚停」与「换季」两个时机用
+ * {@link MinecraftServer#setWeatherParameters} 重写下一段间隔。
+ * 间隔到期后原版自动按 RAIN_DURATION（0.5~1 天）开始并控制时长，
+ * 恰好覆盖饥荒的单场量级，无需干预时长。
+ *
+ * <p>节奏（9 天一季 = 饥荒季长的比例缩放）：
  * <ul>
- *   <li><b>春</b>：下一场雨的延迟改为短区间（默认 0.5~1.5 天），雨时长
- *       维持原版采样——下雨概率显著提高</li>
- *   <li><b>冬</b>：本季第 2~8 天强制持续降雪——雨标志置 true、时长覆盖
- *       到季末；冷 biome 雨天自动降雪（{@code Biome.coldEnoughToSnow}），
- *       暖 biome 表现为冬雨</li>
- *   <li><b>秋/夏</b>：不干预（原版行为）</li>
+ *   <li><b>冬</b>：间歇性降雪——冬一保底一场雪（对齐饥荒 early-winter
+ *       「先铺一层地面积雪」的保底设计），之后每 4~6 天一场。温度已由
+ *       {@link SeasonTemperature} 压到 0.15 以下 → 温带雨即雪、水结冰；
+ *       地面雪层整个冬天不化（随机刻融化要求季节温度 ≥0.15）——视觉上
+ *       整个冬天积雪不退，只有约 1/3 时间天上在下雪，与饥荒一致</li>
+ *   <li><b>春</b>：频繁阵雨——每 1~2 天一场（饥荒春为全季降水最密，
+ *       比例缩放后 9 天约 4 场、覆盖 ~1/3 时间）</li>
+ *   <li><b>秋/夏</b>：不干预（原版低频，对齐饥荒的夏秋偶发）</li>
  * </ul>
  *
- * <p>原版雨长 RAIN_DURATION = UniformInt(12000, 24000)（0.5~1 天）。
- * 玩家 {@code /weather} 命令的优先级高于本控制器（写同一个 WeatherData，
- * 后写者胜）——换季/下雨间隔再触发时会重新接管。
+ * <p>换季接管：离开冬季立即放晴（终止降雪段；回暖后存雪由随机刻渐融）。
+ * 玩家 {@code /weather} 与本控制器写同一状态、后写者胜——下次降水停止
+ * 或换季时重新接管。
  */
 public final class SeasonWeatherController {
-    /** 春季下一场雨的延迟区间（tick）：0.5 ~ 1.5 游戏天。 */
-    static final UniformInt SPRING_RAIN_DELAY = UniformInt.of(12000, 36000);
-    /** 强制降雪状态下的雨时长（tick）：一次给满 1 天，到期 tick 里续期。 */
-    private static final int WINTER_SNOW_DURATION = 24000;
+    /** 冬季降雪间隔（tick）：4~6 天（饥荒 15 天 3~4 场的比例缩放）。 */
+    static final UniformInt WINTER_SNOW_DELAY = UniformInt.of(96000, 144000);
+    /** 春季阵雨间隔（tick）：1~2 天（饥荒春全季最密）。 */
+    static final UniformInt SPRING_RAIN_DELAY = UniformInt.of(24000, 48000);
+    /** 冬一保底雪时长（tick）：1 天（饥荒 early-winter ground cover）。 */
+    private static final int WINTER_OPENING_SNOW = 24000;
 
     private static boolean wasRaining;
     private static Season lastSeason;
-    private static int lastDayOfSeason = -1;
 
     private SeasonWeatherController() {}
 
@@ -43,72 +49,47 @@ public final class SeasonWeatherController {
     public static void tick(MinecraftServer server, ServerLevel overworld) {
         if (!overworld.canHaveWeather()) return;
         Season season = SeasonClock.season(overworld);
-        int day = SeasonClock.dayOfSeason(overworld);
 
-        // 换季瞬间：记录基准（冬季强制雪的持续段由此展开）
         if (season != lastSeason) {
             Season previous = lastSeason;
             lastSeason = season;
             wasRaining = overworld.isRaining();
             // 季节温度换了档：清掉本线程全部群系的温度位置缓存（server 线程侧）
             SeasonBiomeCaches.clear(server.registryAccess());
-            onSeasonChange(server, overworld, previous, season, day);
-        }
-        if (day != lastDayOfSeason) {
-            lastDayOfSeason = day;
-            onDayChange(server, overworld, season, day);
+            onSeasonChange(server, overworld, previous, season);
         }
 
         boolean raining = overworld.isRaining();
         if (wasRaining && !raining) {
-            // 雨刚停：原版即将从 RAIN_DELAY 采样下一场雨的间隔，此刻重写
-            onRainStopped(server, season);
+            // 降水刚停：原版即将从 RAIN_DELAY 采样下一段间隔，此刻按季节重写
+            onPrecipitationStopped(server, season);
         }
         wasRaining = raining;
-
-        // 冬季强制段：雨到期就续期（覆盖原版随机停雨）
-        if (season == Season.WINTER && isWinterSnowForced(day)
-            && overworld.getWeatherData().getRainTime() <= 0) {
-            forceSnow(server, WINTER_SNOW_DURATION);
-        }
     }
 
     private static void onSeasonChange(MinecraftServer server, ServerLevel overworld,
-                                       Season previous, Season newSeason, int dayOfSeason) {
-        // 进冬即雪：冬季首日（秋九之后的第一天）也纳入强制段
-        if (newSeason == Season.WINTER && isWinterSnowForced(dayOfSeason)) {
-            forceSnow(server, WINTER_SNOW_DURATION);
-        }
-        // 离开冬季：立即放晴，结束强制雪（冬九自然停，这里是兜底）
+                                       Season previous, Season newSeason) {
+        int dayOfSeason = SeasonClock.dayOfSeason(overworld);
+        // 离开冬季：立即放晴（终止降雪段；温度回暖后存雪由随机刻渐融）
         if (previous == Season.WINTER && newSeason != Season.WINTER && overworld.isRaining()) {
             server.setWeatherParameters(12000, 0, false, false);
+            return;
+        }
+        // 进入冬季第 1 天：保底一场雪（对齐饥荒 early-winter ground cover；
+        // 服务器重启在冬中的情形不补发——尊重存档天气状态）
+        if (newSeason == Season.WINTER && dayOfSeason == 1) {
+            server.setWeatherParameters(0, WINTER_OPENING_SNOW, true, false);
         }
     }
 
-    private static void onDayChange(MinecraftServer server, ServerLevel overworld,
-                                    Season season, int dayOfSeason) {
-        // 冬季进入强制段的当天（第 2 天）启动持续降雪
-        if (season == Season.WINTER && dayOfSeason == 2) {
-            forceSnow(server, WINTER_SNOW_DURATION);
-        }
-    }
-
-    /** 雨停瞬间按季节重写下一场雨的间隔。 */
-    private static void onRainStopped(MinecraftServer server, Season season) {
-        if (season != Season.SPRING) return;
+    /** 降水停止瞬间：按季节安排下一段间隔（clearWeatherTime）。 */
+    private static void onPrecipitationStopped(MinecraftServer server, Season season) {
         RandomSource random = server.overworld().getRandom();
-        int nextDelay = SPRING_RAIN_DELAY.sample(random);
-        // clearWeatherTime = 下一场雨前的晴天时长；rainTime 顺带同步采样值
-        server.setWeatherParameters(nextDelay, 0, false, false);
-    }
-
-    private static void forceSnow(MinecraftServer server, int durationTicks) {
-        // raining=true + thundering=false；冷 biome 雨即雪
-        server.setWeatherParameters(0, durationTicks, true, false);
-    }
-
-    /** 冬季强制降雪段：本季第 2~8 天。 */
-    static boolean isWinterSnowForced(int dayOfSeason) {
-        return dayOfSeason >= 2 && dayOfSeason <= 8;
+        switch (season) {
+            case WINTER -> server.setWeatherParameters(WINTER_SNOW_DELAY.sample(random), 0, false, false);
+            case SPRING -> server.setWeatherParameters(SPRING_RAIN_DELAY.sample(random), 0, false, false);
+            // 秋/夏：放行原版采样（低频）
+            default -> { }
+        }
     }
 }
