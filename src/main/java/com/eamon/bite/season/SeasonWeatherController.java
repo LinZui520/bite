@@ -47,9 +47,12 @@ public final class SeasonWeatherController {
 
         // 换季瞬间：记录基准（冬季强制雪的持续段由此展开）
         if (season != lastSeason) {
+            Season previous = lastSeason;
             lastSeason = season;
             wasRaining = overworld.isRaining();
-            onSeasonChange(server, overworld, season, day);
+            // 季节温度换了档：清掉本线程全部群系的温度位置缓存（server 线程侧）
+            SeasonBiomeCaches.clear(server.registryAccess());
+            onSeasonChange(server, overworld, previous, season, day);
         }
         if (day != lastDayOfSeason) {
             lastDayOfSeason = day;
@@ -71,14 +74,13 @@ public final class SeasonWeatherController {
     }
 
     private static void onSeasonChange(MinecraftServer server, ServerLevel overworld,
-                                       Season newSeason, int dayOfSeason) {
+                                       Season previous, Season newSeason, int dayOfSeason) {
         // 进冬即雪：冬季首日（秋九之后的第一天）也纳入强制段
         if (newSeason == Season.WINTER && isWinterSnowForced(dayOfSeason)) {
             forceSnow(server, WINTER_SNOW_DURATION);
         }
-        // 离开冬季：立即放晴，结束强制雪（8 天之后的冬九自然停）
-        if (lastSeason != null && lastSeason == Season.WINTER
-            && newSeason != Season.WINTER && overworld.isRaining()) {
+        // 离开冬季：立即放晴，结束强制雪（冬九自然停，这里是兜底）
+        if (previous == Season.WINTER && newSeason != Season.WINTER && overworld.isRaining()) {
             server.setWeatherParameters(12000, 0, false, false);
         }
     }

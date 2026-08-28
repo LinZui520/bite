@@ -6,16 +6,11 @@ import net.minecraft.world.level.Level;
  * 季节时钟：从世界时钟推导，零存储零同步（26.2 WorldClock 体系，
  * 与 {@link com.eamon.bite.freshness.FreshnessClock} 同源）。
  *
- * <p>规则（用户口径 2026-08-29）：
- * <ul>
- *   <li>9 天为一季，四季顺序 <b>秋 → 冬 → 春 → 夏</b>——游戏第 1 天是秋一</li>
- *   <li>展示为「秋一～秋九」「冬一～冬九」…36 天一轮回到秋一</li>
- * </ul>
+ * <p>规则：9 天为一季，四季顺序 <b>秋 → 冬 → 春 → 夏</b>——游戏第 1 天是秋一。
+ * 36 天一轮回到秋一。
  *
  * <p>天数基准：世界时钟 totalTicks / 24000 的商即「已开始的天数」。
  * 新世界从 tick 0 开始，第 0 个自然日即秋一；之后每跨一个自然日进一位。
- * 「早上起床或熬夜到点」的提示触发由 SeasonAnnouncer 检测自然日进位实现，
- * 本类只负责静态推导，供后续季节化世界属性直接查询。
  */
 public final class SeasonClock {
     public static final int DAYS_PER_SEASON = 9;
@@ -23,7 +18,16 @@ public final class SeasonClock {
     public static final Season STARTING_SEASON = Season.AUTUMN;
     private static final int DAYS_PER_CYCLE = DAYS_PER_SEASON * Season.values().length;
 
+    /** 当前季节缓存（无 Level 上下文的钩子读取；双端各自每 tick 刷新，模式同 FreshnessClock）。 */
+    private static volatile Season current = Season.AUTUMN;
+
     private SeasonClock() {}
+
+    /** 最近一次 {@link #update} 刷新的当前季节（启动前默认秋 = 偏移 0，新世界首日恰好一致）。 */
+    public static Season current() { return current; }
+
+    /** 每 tick 由 server / client 侧调用（overworld）。 */
+    public static void update(Level level) { current = season(level); }
 
     /** 从世界时钟 totalTicks 推导当前季节（任意维度 → overworld WorldClock）。 */
     public static Season season(Level level) {

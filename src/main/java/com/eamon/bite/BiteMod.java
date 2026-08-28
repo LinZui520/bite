@@ -10,6 +10,7 @@ import com.eamon.bite.freshness.FreshnessScanner;
 import com.eamon.bite.freshness.FreshnessStamper;
 import com.eamon.bite.freshness.ShelfLifeRegistry;
 import com.eamon.bite.item.BiteItems;
+import com.eamon.bite.season.SeasonClock;
 import com.eamon.bite.season.SeasonWeatherController;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -41,11 +42,12 @@ public class BiteMod implements ModInitializer {
         registerLazyScan();
         registerSpoiledFoodBlock();
         BiteCommands.register();
-        // 无 Level 上下文的静态钩子（合并重算、客户端渲染）读 FreshnessClock，
-        // 每 tick 用主世界时钟刷新它（客户端侧由 BiteModClient 刷新）。
-        // 同一 tick 驱动季节天气（春雨加密 / 冬季强制雪）。
+        // 无 Level 上下文的静态钩子（合并重算、客户端渲染、季节温度）读
+        // FreshnessClock / SeasonClock，每 tick 用主世界时钟刷新它们
+        // （客户端侧由 BiteModClient 刷新）。同一 tick 驱动季节天气。
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             FreshnessClock.update(FreshnessClock.now(server.overworld()));
+            SeasonClock.update(server.overworld());
             SeasonWeatherController.tick(server, server.overworld());
         });
         LOGGER.info("Because It's Too Easy initialized");

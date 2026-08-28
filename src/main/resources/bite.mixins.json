@@ -12,7 +12,11 @@
     "AbstractContainerMenuMixin",
     "HopperBlockEntityMixin",
     "AbstractFurnaceBlockEntityMixin",
-    "ResultSlotMixin"
+    "ResultSlotMixin",
+    "BiomeMixin",
+    "BiomeTemperatureCacheAccess",
+    "SnowLayerBlockMixin",
+    "IceBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1
