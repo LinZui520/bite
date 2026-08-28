@@ -5,13 +5,14 @@ import com.eamon.bite.season.SeasonClock;
 import com.eamon.bite.season.SeasonText;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -19,13 +20,13 @@ import net.minecraft.resources.Identifier;
  * 渐入（10t）→ 停留（70t）→ 渐出（20t）。
  *
  * <p>纯客户端实现——SeasonClock 是世界时钟纯函数，客户端拿 client.level
- * 直接算，无需任何网络同步。跨日检测每客户端 tick 做一次（与服务端
- * SeasonAnnouncer 语义一致：睡觉跳清晨、熬夜到点都是 totalTicks 跨过
- * 24000 倍数）。
+ * 直接算，无需任何网络同步。跨日检测与动画计时都挂在
+ * {@link ClientTickEvents#END_CLIENT_TICK}（每秒固定 20 次、帧率无关）；
+ * 渲染层只按当前状态绘制。<b>不得</b>在 {@code extractRenderState} 里推进
+ * 计数器——它每渲染帧调用一次，60+ fps 会让动画快进 3~12 倍。
  *
- * <p>渲染：字号 = 原版普通字体（不开阴影，渐隐靠 alpha 分层）；位置 =
- * 屏幕水平居中、垂直 12% 高度处（原版 title 固定在 ~25%，这里更靠上、
- * 字更小）。
+ * <p>渲染：字号 = 原版普通字体（不开阴影，渐隐靠 alpha）；位置 =
+ * 屏幕水平居中、垂直 12% 高度处。
  */
 @Environment(EnvType.CLIENT)
 public final class SeasonHud implements HudElement {
@@ -38,33 +39,16 @@ public final class SeasonHud implements HudElement {
     private int animationTick = TOTAL_TICKS; // 空闲态（动画结束）
     private Component currentTitle;
 
-    /** 注册入口（客户端 onInitializeClient 调用）。 */
+    /** 注册 HUD 与客户端 tick 驱动（onInitializeClient 调用一次）。 */
     public static void register() {
+        SeasonHud hud = new SeasonHud();
         HudElementRegistry.addLast(
-            Identifier.fromNamespaceAndPath("bite", "season_announce"),
-            new SeasonHud());
+            Identifier.fromNamespaceAndPath("bite", "season_announce"), hud);
+        ClientTickEvents.END_CLIENT_TICK.register(client -> hud.tick(client));
     }
 
-    @Override
-    public void extractRenderState(GuiGraphicsExtractor gui, DeltaTracker delta) {
-        tick();
-        if (animationTick >= TOTAL_TICKS) return;
-
-        float alpha = alphaAt(animationTick);
-        if (alpha <= 0.0f) return;
-
-        Font font = Minecraft.getInstance().font;
-        int width = font.width(currentTitle);
-        int x = (gui.guiWidth() - width) / 2;
-        int y = Math.round(gui.guiHeight() * VERTICAL_RATIO);
-
-        int a = (int) (alpha * 255.0f) << 24;
-        gui.text(font, currentTitle, x, y, 0xFFFFFF | a, false);
-    }
-
-    /** 每渲染 tick 前进动画并检测跨日。 */
-    private void tick() {
-        Minecraft client = Minecraft.getInstance();
+    /** 每客户端 tick（20/s）：跨日检测 + 动画计时。 */
+    private void tick(Minecraft client) {
         if (client.level == null) {
             // 掉出世界（断线/切存档）：重置检测基准，重进世界当天的提示不发
             lastDay = Long.MIN_VALUE;
@@ -82,7 +66,25 @@ public final class SeasonHud implements HudElement {
                 SeasonClock.seasonAtDay(day), SeasonClock.dayOfSeasonAtDay(day));
             animationTick = 0;
         }
-        animationTick = Math.min(animationTick + 1, TOTAL_TICKS);
+        if (animationTick < TOTAL_TICKS) {
+            animationTick++;
+        }
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor gui, DeltaTracker delta) {
+        if (animationTick >= TOTAL_TICKS || currentTitle == null) return;
+
+        float alpha = alphaAt(animationTick);
+        if (alpha <= 0.0f) return;
+
+        Font font = Minecraft.getInstance().font;
+        int width = font.width(currentTitle);
+        int x = (gui.guiWidth() - width) / 2;
+        int y = Math.round(gui.guiHeight() * VERTICAL_RATIO);
+
+        int a = (int) (alpha * 255.0f) << 24;
+        gui.text(font, currentTitle, x, y, 0xFFFFFF | a, false);
     }
 
     /** 渐入线性升、停留恒 1、渐出线性降。 */
