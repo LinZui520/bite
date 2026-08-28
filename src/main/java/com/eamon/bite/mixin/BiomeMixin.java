@@ -1,7 +1,6 @@
 package com.eamon.bite.mixin;
 
 import com.eamon.bite.season.SeasonClock;
-import com.eamon.bite.season.SeasonTemperature;
 import net.minecraft.world.level.biome.Biome;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -9,7 +8,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 季节温度注入点：{@code Biome.getBaseTemperature} 的返回值加季节偏移。
+ * 季节温度注入点：{@code Biome.getBaseTemperature} 的返回值加季节偏移
+ * （经 {@link SeasonClock#currentOffset()}，换季日当天含线性过渡）。
  *
  * <p>该方法是全部运行时温度消费的汇合点（雨雪分界 warmEnoughToRain /
  * coldEnoughToSnow / getPrecipitationAt、结冰、雪层堆积、F3 显示都经
@@ -24,11 +24,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * <p>已知坑：Biome.getTemperature 有按位置的 ThreadLocal LRU 缓存且无
  * 失效机制——换季时须由 {@link com.eamon.bite.season.SeasonBiomeCaches}
  * 在 server / render 线程各清一次，否则旧季节的判定会缓存到 1024 个位置。
+ * 换季过渡期内偏移逐 tick 变化，缓存会在过渡首 tick 失效一次后重新
+ * 灌入插值中的值——进度推进带来的微小漂移可接受（阈值翻转在中段，
+ * 恰好是缓存重新采样后）。
  */
 @Mixin(Biome.class)
 public abstract class BiomeMixin {
     @Inject(method = "getBaseTemperature", at = @At("RETURN"), cancellable = true)
     private void bite$seasonalTemperature(CallbackInfoReturnable<Float> cir) {
-        cir.setReturnValue(SeasonTemperature.seasonal(cir.getReturnValueF(), SeasonClock.current()));
+        cir.setReturnValue(cir.getReturnValueF() + SeasonClock.currentOffset());
     }
 }

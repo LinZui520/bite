@@ -28,9 +28,9 @@ import net.minecraft.world.level.saveddata.WeatherData;
  *   <li><b>秋/夏</b>：不干预（原版低频，对齐饥荒的夏秋偶发）</li>
  * </ul>
  *
- * <p>换季接管：离开冬季立即放晴（终止降雪段；回暖后存雪由随机刻渐融）。
- * 玩家 {@code /weather} 与本控制器写同一状态、后写者胜——下次降水停止
- * 或换季时重新接管。
+ * <p>换季接管：不打断进行中的降水（温度过渡 + rainLevel 渐变让雪自然
+ * 变雨；下完后的间隔按新季节节奏重排）。玩家 {@code /weather} 与本控制器
+ * 写同一状态、后写者胜——下次降水停止或换季时重新接管。
  */
 public final class SeasonWeatherController {
     /** 冬季降雪间隔（tick）：4~6 天（饥荒 15 天 3~4 场的比例缩放）。 */
@@ -70,10 +70,11 @@ public final class SeasonWeatherController {
     private static void onSeasonChange(MinecraftServer server, ServerLevel overworld,
                                        Season previous, Season newSeason) {
         int dayOfSeason = SeasonClock.dayOfSeason(overworld);
-        // 离开冬季：立即放晴（终止降雪段；温度回暖后存雪由随机刻渐融）
-        if (previous == Season.WINTER && newSeason != Season.WINTER && overworld.isRaining()) {
-            server.setWeatherParameters(12000, 0, false, false);
-            return;
+        // 离开冬季：不打断正在下的雪——温度过渡会让它在当天自然变成雨
+        // （rainLevel 渐变缓冲形态翻转），下完后的间隔按春季节奏走。
+        // 只有「雪已停、正处冬季长间隔」时才立即改排春雨间隔。
+        if (previous == Season.WINTER && newSeason != Season.WINTER && !overworld.isRaining()) {
+            onPrecipitationStopped(server, newSeason);
         }
         // 进入冬季第 1 天：保底一场雪（对齐饥荒 early-winter ground cover；
         // 服务器重启在冬中的情形不补发——尊重存档天气状态）

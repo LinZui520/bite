@@ -23,7 +23,7 @@ public abstract class IceBlockMixin {
     @Inject(method = "randomTick", at = @At("HEAD"), cancellable = true)
     private void bite$meltSeasonalIce(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
         float seasonalTemp = level.getBiome(pos).value().getBaseTemperature();
-        if (!SeasonTemperature.shouldMeltSnow(seasonalTemp, SeasonClock.current())) return;
+        if (!SeasonTemperature.shouldMeltSnow(seasonalTemp, SeasonClock.currentOffset())) return;
         if (level.environmentAttributes().getValue(EnvironmentAttributes.WATER_EVAPORATES, pos)) {
             level.removeBlock(pos, false);
         } else {

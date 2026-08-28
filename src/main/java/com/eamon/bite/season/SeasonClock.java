@@ -20,14 +20,28 @@ public final class SeasonClock {
 
     /** 当前季节缓存（无 Level 上下文的钩子读取；双端各自每 tick 刷新，模式同 FreshnessClock）。 */
     private static volatile Season current = Season.AUTUMN;
+    /** 当前生效的季节温度偏移（换季日当天含线性过渡）。 */
+    private static volatile float currentOffset = SeasonTemperature.offset(Season.AUTUMN);
 
     private SeasonClock() {}
 
     /** 最近一次 {@link #update} 刷新的当前季节（启动前默认秋 = 偏移 0，新世界首日恰好一致）。 */
     public static Season current() { return current; }
 
+    /** 当前生效的季节温度偏移（含换季过渡）。 */
+    public static float currentOffset() { return currentOffset; }
+
     /** 每 tick 由 server / client 侧调用（overworld）。 */
-    public static void update(Level level) { current = season(level); }
+    public static void update(Level level) {
+        current = season(level);
+        currentOffset = SeasonTemperature.blendOffset(
+            current, dayOfSeason(level), dayProgress(level));
+    }
+
+    /** 当日内进度 [0,1)：totalTicks 对 24000 取余。 */
+    static float dayProgress(Level level) {
+        return (level.getOverworldClockTime() % 24000L) / 24000f;
+    }
 
     /** 从世界时钟 totalTicks 推导当前季节（任意维度 → overworld WorldClock）。 */
     public static Season season(Level level) {

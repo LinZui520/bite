@@ -25,7 +25,7 @@ public abstract class SnowLayerBlockMixin {
     @Inject(method = "randomTick", at = @At("HEAD"), cancellable = true)
     private void bite$meltSeasonalSnow(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
         float seasonalTemp = level.getBiome(pos).value().getBaseTemperature();
-        if (!SeasonTemperature.shouldMeltSnow(seasonalTemp, SeasonClock.current())) return;
+        if (!SeasonTemperature.shouldMeltSnow(seasonalTemp, SeasonClock.currentOffset())) return;
         level.removeBlock(pos, false);
         ci.cancel();
     }
