@@ -21,7 +21,8 @@
     "ServerPlayerMovementMixin",
     "PlayerAttackExhaustionMixin",
     "FoodDataExhaustionAccess",
-    "PlayerDataMixin"
+    "PlayerDataMixin",
+    "CampfireBlockEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1
