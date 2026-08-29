@@ -23,6 +23,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class PlayerDataMixin extends LivingEntity implements ThirstData.Holder {
     @Unique
     private float bite$thirst = ThirstData.MAX_THIRST;
+    /** 干渴伤害计时器（不持久化：重生/重进后从 0 起数，对齐原版 tickTimer 的会话语义）。 */
+    @Unique
+    private int bite$thirstTimer;
 
     protected PlayerDataMixin(EntityType<? extends LivingEntity> entityType, Level level) {
         super(entityType, level);
@@ -36,6 +39,16 @@ public abstract class PlayerDataMixin extends LivingEntity implements ThirstData
     @Override
     public void bite$setThirst(float value) {
         bite$thirst = value;
+    }
+
+    @Override
+    public int bite$thirstTimer() {
+        return bite$thirstTimer;
+    }
+
+    @Override
+    public void bite$setThirstTimer(int value) {
+        bite$thirstTimer = value;
     }
 
     @Inject(method = "addAdditionalSaveData", at = @At("RETURN"))

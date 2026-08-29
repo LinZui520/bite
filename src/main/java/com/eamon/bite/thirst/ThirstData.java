@@ -55,9 +55,21 @@ public final class ThirstData {
     public interface Holder {
         float bite$getThirst();
         void bite$setThirst(float value);
+        /** 干渴伤害计时器（对齐原版 FoodData.tickTimer 的语义：归零起数 80 tick）。 */
+        int bite$thirstTimer();
+        void bite$setThirstTimer(int value);
     }
 
     private static Holder asHolder(Player player) {
         return (Holder) player;
+    }
+
+    /** 干渴伤害计时器（供 ThirstController 读写）。 */
+    public static int thirstTimer(Player player) {
+        return asHolder(player).bite$thirstTimer();
+    }
+
+    public static void setThirstTimer(Player player, int value) {
+        asHolder(player).bite$setThirstTimer(value);
     }
 }

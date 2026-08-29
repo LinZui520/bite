@@ -11,16 +11,25 @@ import net.minecraft.world.item.Item;
 /**
  * 饥渴 tick 驱动：流失（基础 × 季节 + 疾跑）与惩罚（禁疾跑 / 干渴伤害）。
  *
- * <p>惩罚结构对齐原版饥饿：≤6 服务端强制 setSprinting(false)（客户端
- * isSprintingPossible mixin 做本地预测拦截）；=0 每 80 tick 1 点
- * generic damage——简单/普通难度扣到 {10, 1} 血为止，困难可致死。
- * 和平/创造/旁观完全豁免（不流失、不伤害）。
+ * <p><b>惩罚与原版饿死完全同构</b>（FoodData.tick 的 starve 分支逐行对齐）：
+ * <ul>
+ *   <li>≤6 不能疾跑（客户端 isSprintingPossible 预测拦截 + 服务端
+ *       setSprinting(false) 兜底）</li>
+ *   <li>=0 每 80 tick 1 点伤害，判定式与原版相同：
+ *       {@code health > 10 || HARD || (health > 1 && NORMAL)}——
+ *       简单扣到 10 血、普通扣到 1 血、困难可致死</li>
+ *   <li>伤害源用 {@code drown()}（26.2 无 dehydrate；drown 的死亡消息
+ *       「被淹死了」最接近渴死语义——原版 starve 也只是 generic 类
+ *       伤害源 + 专属消息，复用现成源避免注册新 DamageType）</li>
+ *   <li>伤害节拍用独立计时器 thirstTimer（对齐原版 tickTimer 语义：
+ *       从归零那刻起数 80 tick，而非 tickCount 取模——死亡重生后
+ *       tickCount 清零的错拍问题同样规避）</li>
+ * </ul>
+ * 和平/创造/旁观完全豁免（不流失、不伤害；和平缓慢回满）。
  *
- * <p>同步：每 tick 末尾向各玩家推送 {@link ThirstSyncPacket}——
- * FLOAT 包 ~7 字节/玩家/tick，20 人服 ~2.8 KB/s，可忽略。
+ * <p>同步：每 tick 末尾向各玩家推送 {@link ThirstSyncPacket}。
  */
 public final class ThirstController {
-    private static final float[] DAMAGE_CAP = {10.0f, 1.0f}; // easy, normal
 
     private ThirstController() {}
 
@@ -52,10 +61,19 @@ public final class ThirstController {
         }
         ThirstData.add(player, -drain);
 
-        // 干渴伤害（=0 时）
-        if (ThirstData.get(player) <= 0.0f
-            && player.tickCount % ThirstData.DAMAGE_INTERVAL_TICKS == 0) {
-            applyThirstDamage(player);
+        // 干渴伤害（=0 时）——判定式与原版 starve 分支完全一致
+        if (ThirstData.get(player) <= 0.0f) {
+            ThirstData.setThirstTimer(player, ThirstData.thirstTimer(player) + 1);
+            if (ThirstData.thirstTimer(player) >= ThirstData.DAMAGE_INTERVAL_TICKS) {
+                Difficulty difficulty = player.level().getDifficulty();
+                if (player.getHealth() > 10.0F || difficulty == Difficulty.HARD
+                    || player.getHealth() > 1.0F && difficulty == Difficulty.NORMAL) {
+                    player.hurtServer(player.level(), player.damageSources().drown(), 1.0F);
+                }
+                ThirstData.setThirstTimer(player, 0);
+            }
+        } else {
+            ThirstData.setThirstTimer(player, 0);
         }
     }
 
@@ -66,20 +84,6 @@ public final class ThirstController {
             case WINTER -> 0.75f;
             default -> 1.0f;
         };
-    }
-
-    private static void applyThirstDamage(ServerPlayer player) {
-        Difficulty difficulty = player.level().getDifficulty();
-        float health = player.getHealth();
-        float cap = switch (difficulty) {
-            case EASY -> DAMAGE_CAP[0];
-            case NORMAL -> DAMAGE_CAP[1];
-            default -> Float.MAX_VALUE; // HARD 可致死
-        };
-        if (health > cap || health > 1.0f && difficulty == Difficulty.HARD) {
-            player.hurtServer(player.level(),
-                player.damageSources().generic(), 1.0f);
-        }
     }
 
     /** 睡觉补结算（时钟跳变时由 SleepMixin 调用，skippedTicks 为跳过量）。 */
