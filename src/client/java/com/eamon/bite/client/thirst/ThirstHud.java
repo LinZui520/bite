@@ -11,24 +11,37 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * 饥渴 HUD：饥饿条上方一排水滴（10 滴，0~20），布局对齐原版食物条
+ * 饥渴 HUD：饥饿条上方一排 💧（10 滴，0~20），布局对齐原版食物条
  * （右侧锚定 guiWidth/2+91、每滴 8px、9×9 贴图）。
  *
- * <p><b>与氧气条的让位</b>：原版氧气条平时画在 guiHeight-49（Hud.java
- * 的 yLineAir = yLineBase-10）——与水滴行重合。水下或氧气不满时
- * （extractAirBubbles 的显示条件），水滴上移一行到 -59 让位；平时
- * 回到 -49。这是原版自己的让位语言（氧气条对坐骑心脏也是上移让位）。
+ * <p><b>生动性</b>（对齐原版饥饿条的行为语言）：
+ * <ul>
+ *   <li>低水抖动：水合 ≤6（疾跑线）时每滴上下随机 1px 抖动——
+ *       原版「饥饿 0 饱和度时食物图标抖动」同款（含按剩余值变频的节拍）</li>
+ *   <li>临界闪烁：水合 ≤3 时整条按 0.5s 周期闪「熄灭」，干渴临头的
+ *       紧迫感（相位用 gameTime 保证确定性）</li>
+ * </ul>
  *
- * <p>渲染顺序：attachElementBefore(FOOD_BAR)——与原版饥饿条同层叠序。
+ * <p><b>与氧气条的让位</b>：氧气条可见时（水下/缺氧）水滴上移一行
+ * 到 -59，平时 -49——原版「氧气条对坐骑心脏让位」同一语言。
  */
 @Environment(EnvType.CLIENT)
 public final class ThirstHud implements HudElement {
     private static final Identifier EMPTY = Identifier.fromNamespaceAndPath("bite", "hud/thirst_empty");
     private static final Identifier HALF = Identifier.fromNamespaceAndPath("bite", "hud/thirst_half");
     private static final Identifier FULL = Identifier.fromNamespaceAndPath("bite", "hud/thirst_full");
+
+    /** 抖动阈值（= 疾跑线）。 */
+    private static final float JITTER_THRESHOLD = 6.0f;
+    /** 闪烁阈值（临近干渴）。 */
+    private static final float BLINK_THRESHOLD = 3.0f;
+
+    private final RandomSource random = RandomSource.create();
 
     /** 注册入口（onInitializeClient 调用）。 */
     public static void register() {
@@ -44,20 +57,37 @@ public final class ThirstHud implements HudElement {
         if (player == null) return;
         if (player.isCreative() || player.isSpectator()) return;
 
+        Minecraft client = Minecraft.getInstance();
         float thirst = ThirstClientStore.get();
+        long gameTime = client.level == null ? 0 : client.level.getGameTime();
+
         // 氧气条可见时（水下/缺氧，原版显示条件）上移一行让位
         boolean airBarVisible = player.isEyeInFluid(FluidTags.WATER)
             || player.getAirSupply() < player.getMaxAirSupply();
-        int y = gui.guiHeight() - (airBarVisible ? 59 : 49);
+        int baseY = gui.guiHeight() - (airBarVisible ? 59 : 49);
         int xRight = gui.guiWidth() / 2 + 91;
 
+        // 临界闪烁：≤3 时 0.5s 周期的「熄灭」相（10 tick 半周期）
+        boolean blinkOff = thirst <= BLINK_THRESHOLD
+            && Mth.sin(gameTime * (float) (Math.PI * 2 / 10)) < 0.0f;
+
+        // 抖动节拍：剩余越少抖得越频繁（原版 food*3+1 变频的反向运用）
+        int jitterBeat = Math.max((int) thirst, 1) * 3 + 1;
+
         for (int i = 0; i < 10; i++) {
+            int yo = baseY;
+            if (thirst <= JITTER_THRESHOLD && gameTime % jitterBeat == 0) {
+                yo += random.nextInt(3) - 1;
+            }
             int xo = xRight - i * 8 - 9;
-            gui.blitSprite(RenderPipelines.GUI_TEXTURED, EMPTY, xo, y, 9, 9);
+            if (blinkOff) {
+                continue; // 熄灭相：整滴跳过
+            }
+            gui.blitSprite(RenderPipelines.GUI_TEXTURED, EMPTY, xo, yo, 9, 9);
             if (i * 2 + 1 < thirst) {
-                gui.blitSprite(RenderPipelines.GUI_TEXTURED, FULL, xo, y, 9, 9);
+                gui.blitSprite(RenderPipelines.GUI_TEXTURED, FULL, xo, yo, 9, 9);
             } else if (i * 2 + 1 <= thirst + 0.5f && i * 2 + 0.5f <= thirst) {
-                gui.blitSprite(RenderPipelines.GUI_TEXTURED, HALF, xo, y, 9, 9);
+                gui.blitSprite(RenderPipelines.GUI_TEXTURED, HALF, xo, yo, 9, 9);
             }
         }
     }
