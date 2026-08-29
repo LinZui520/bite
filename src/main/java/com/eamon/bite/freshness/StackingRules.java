@@ -33,18 +33,27 @@ import net.minecraft.world.item.ItemStack;
 public final class StackingRules {
     private StackingRules() {}
 
-    /** 等价性放宽判定：同 item、双方已打标、保质期有限、双方未完全变质。 */
+    /**
+     * 等价性放宽判定：同 item、已打标的一方未完全变质。
+     *
+     * <p>允许<b>单边有戳</b>（熔炉场景：result 槽里的产物已带继承戳，
+     * recipe 模板无戳）——此时放宽通过，由合并站点在 grow 时做加权
+     * 平均（无戳方按「全新」参与）。双边有戳时双方都须未变质。
+     * 永不腐坏（无 SHELF_LIFE 或 ≤0）的栈不参与放宽（原版行为）。
+     */
     public static boolean canMergeRelaxed(ItemStack a, ItemStack b) {
         if (a.isEmpty() || b.isEmpty() || !a.is(b.getItem())) return false;
         FreshnessStamp sa = a.get(BiteComponents.FRESHNESS);
         FreshnessStamp sb = b.get(BiteComponents.FRESHNESS);
-        if (sa == null || sb == null) return false;
+        if (sa == null && sb == null) return false;
         ShelfLife la = a.get(BiteComponents.SHELF_LIFE);
         ShelfLife lb = b.get(BiteComponents.SHELF_LIFE);
         if (la == null || la.spoilTicks() <= 0) return false;
         if (lb == null || lb.spoilTicks() <= 0) return false;
         long now = FreshnessClock.now();
-        return FreshnessMath.fraction(now, sa, la) > 0.0 && FreshnessMath.fraction(now, sb, lb) > 0.0;
+        if (sa != null && FreshnessMath.fraction(now, sa, la) <= 0.0) return false;
+        if (sb != null && FreshnessMath.fraction(now, sb, lb) <= 0.0) return false;
+        return true;
     }
 
     /**
