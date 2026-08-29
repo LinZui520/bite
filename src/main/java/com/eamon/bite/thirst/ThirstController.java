@@ -77,11 +77,10 @@ public final class ThirstController {
         }
     }
 
-    /** 季节流失系数：夏 1.5 / 冬 0.75 / 春秋 1。 */
+    /** 季节流失系数：夏 ×1.25（出汗），其余 1（用户口径 2026-08-30）。 */
     public static float seasonMultiplier(Player player) {
         return switch (SeasonClock.season(player.level())) {
-            case SUMMER -> 1.5f;
-            case WINTER -> 0.75f;
+            case SUMMER -> 1.25f;
             default -> 1.0f;
         };
     }

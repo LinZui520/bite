@@ -1,6 +1,7 @@
 package com.eamon.bite.hunger;
 
 import com.eamon.bite.config.ServerConfig;
+import com.eamon.bite.season.SeasonClock;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.food.FoodData;
 
@@ -10,8 +11,9 @@ import net.minecraft.world.food.FoodData;
  * <p>口径（2026-08-30 设计）：
  * <ul>
  *   <li><b>饿腹代谢</b>：每 tick 对所有在线玩家加微量疲劳。默认 0.00208
- *       （半档，2 游戏日 20→0）；满档 0.00417 = 1 游戏日掉空。走原版
- *       结算链（4 疲劳 → 1 饱和度/鸡腿）——和平模式天然豁免
+ *       （半档，2 游戏日 20→0）；满档 0.00417 = 1 游戏日掉空。冬季
+ *       ×1.25（御寒耗能，用户口径 2026-08-30）。走原版结算链
+ *       （4 疲劳 → 1 饱和度/鸡腿）——和平模式天然豁免
  *       （FoodData.tick 的 PEACEFUL 守卫）、饱和度先烧、睡觉跳过的时间
  *       不在此结算（见 {@link #onSleptThroughTicks}）</li>
  *   <li><b>睡觉补结算</b>：睡觉使时钟瞬移到次日 0 刻（被跳过的 tick 不
@@ -35,8 +37,16 @@ public final class HungerMetabolism {
         for (ServerPlayer player : players) {
             // 创造/旁观不消耗（对齐原版：它们不参与饥饿系统）
             if (player.isCreative() || player.isSpectator()) continue;
-            player.causeFoodExhaustion(rate);
+            player.causeFoodExhaustion(rate * seasonMultiplier(player));
         }
+    }
+
+    /** 季节代谢系数：冬 ×1.25（御寒耗能），其余 1。 */
+    public static float seasonMultiplier(ServerPlayer player) {
+        return switch (SeasonClock.season(player.level())) {
+            case WINTER -> 1.25f;
+            default -> 1.0f;
+        };
     }
 
     /**
