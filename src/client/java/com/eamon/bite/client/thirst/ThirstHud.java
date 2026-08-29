@@ -10,21 +10,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * 饥渴 HUD：饥饿条上方一排 💧（10 滴，0~20），布局对齐原版食物条
- * （右侧锚定 guiWidth/2+91、每滴 8px、9×9 贴图）。
+ * 饥渴 HUD：饥饿条上方一排 💧（10 滴，0~20），布局与低水抖动完全对齐
+ * 原版食物条（右侧锚定 guiWidth/2+91、每滴 8px、9×9 贴图）。
  *
- * <p><b>生动性</b>（对齐原版饥饿条的行为语言）：
- * <ul>
- *   <li>低水抖动：水合 ≤6（疾跑线）时每滴上下随机 1px 抖动——
- *       原版「饥饿 0 饱和度时食物图标抖动」同款（含按剩余值变频的节拍）</li>
- *   <li>临界闪烁：水合 ≤3 时整条按 0.5s 周期闪「熄灭」，干渴临头的
- *       紧迫感（相位用 gameTime 保证确定性）</li>
- * </ul>
+ * <p><b>低水抖动（原版 extractFood 同款语义）</b>：水合 ≤6（疾跑线，
+ * 对应原版饱和度归零的条件）时，{@code yo += random.nextInt(3) - 1}——
+ * 每滴 ±1px 上下抖，节拍 {@code gameTime % (thirst*3+1) == 0} 随剩余值
+ * 变频（水越少抖得越密）；随机源每帧重播种 {@code gameTime * 312871}
+ * ——与原版 tickCount 同构，保证同一 tick 内所有滴的抖动模式稳定、
+ * 帧间自然变化。无额外闪烁效果（原版饥饿条也没有）。
  *
  * <p><b>固定第二行</b>：饥饿/心 = 第一行（-39）、水滴 = 第二行（-49）、
  * 氧气 = 第三行（-59，由 HudAirMixin 把原版氧气基线无条件下移一行）。
@@ -35,10 +33,8 @@ public final class ThirstHud implements HudElement {
     private static final Identifier HALF = Identifier.fromNamespaceAndPath("bite", "hud/thirst_half");
     private static final Identifier FULL = Identifier.fromNamespaceAndPath("bite", "hud/thirst_full");
 
-    /** 抖动阈值（= 疾跑线）。 */
+    /** 抖动阈值（= 疾跑线，对应原版「饱和度归零才开始抖」的临界语义）。 */
     private static final float JITTER_THRESHOLD = 6.0f;
-    /** 闪烁阈值（临近干渴）。 */
-    private static final float BLINK_THRESHOLD = 3.0f;
 
     private final RandomSource random = RandomSource.create();
 
@@ -56,31 +52,25 @@ public final class ThirstHud implements HudElement {
         if (player == null) return;
         if (player.isCreative() || player.isSpectator()) return;
 
-        Minecraft client = Minecraft.getInstance();
         float thirst = ThirstClientStore.get();
-        long gameTime = client.level == null ? 0 : client.level.getGameTime();
+        long gameTime = Minecraft.getInstance().level == null ? 0 : Minecraft.getInstance().level.getGameTime();
+        // 每帧重播种（原版 setSeed(tickCount * 312871) 同构）：同 tick 稳定、帧间变化
+        random.setSeed(gameTime * 312871L);
 
         // 固定第二行（guiHeight-49）：饥饿/心第一行、水滴第二行、氧气第三行
-        // （氧气条由 HudAirMixin 无条件下移一行，不再需要让位逻辑）
         int baseY = gui.guiHeight() - 49;
         int xRight = gui.guiWidth() / 2 + 91;
 
-        // 临界闪烁：≤3 时 0.5s 周期的「熄灭」相（10 tick 半周期）
-        boolean blinkOff = thirst <= BLINK_THRESHOLD
-            && Mth.sin(gameTime * (float) (Math.PI * 2 / 10)) < 0.0f;
-
-        // 抖动节拍：剩余越少抖得越频繁（原版 food*3+1 变频的反向运用）
+        // 抖动节拍：thirst*3+1（原版 food*3+1 同式，水越少抖得越频繁）
         int jitterBeat = Math.max((int) thirst, 1) * 3 + 1;
+        boolean jitter = thirst <= JITTER_THRESHOLD;
 
         for (int i = 0; i < 10; i++) {
             int yo = baseY;
-            if (thirst <= JITTER_THRESHOLD && gameTime % jitterBeat == 0) {
+            if (jitter && gameTime % jitterBeat == 0) {
                 yo += random.nextInt(3) - 1;
             }
             int xo = xRight - i * 8 - 9;
-            if (blinkOff) {
-                continue; // 熄灭相：整滴跳过
-            }
             gui.blitSprite(RenderPipelines.GUI_TEXTURED, EMPTY, xo, yo, 9, 9);
             if (i * 2 + 1 < thirst) {
                 gui.blitSprite(RenderPipelines.GUI_TEXTURED, FULL, xo, yo, 9, 9);
