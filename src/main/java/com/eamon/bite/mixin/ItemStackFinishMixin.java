@@ -33,5 +33,8 @@ public abstract class ItemStackFinishMixin {
         // capture 非 null 已保证 entity 是 Player（EatSnapshot.capture 的捕获条件）
         bite$snap.applyPenalty((Player) entity);
         bite$snap = null;
+        // 饮食补水（饥渴系统）：ITEM 返回后从 this 取实际物品
+        ItemStack self = (ItemStack) (Object) this;
+        com.eamon.bite.thirst.ThirstController.onConsume((Player) entity, self.getItem());
     }
 }

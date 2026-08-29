@@ -2,6 +2,8 @@ package com.eamon.bite.client;
 
 import com.eamon.bite.client.hud.FadingHudText;
 import com.eamon.bite.client.season.SeasonHud;
+import com.eamon.bite.client.thirst.ThirstClientStore;
+import com.eamon.bite.client.thirst.ThirstHud;
 import com.eamon.bite.config.ClientConfig;
 import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.season.Season;
@@ -32,5 +34,7 @@ public class BiteModClient implements ClientModInitializer {
         });
         FadingHudText.register();
         SeasonHud.register();
+        ThirstHud.register();
+        ThirstClientStore.register();
     }
 }

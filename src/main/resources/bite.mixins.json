@@ -20,7 +20,8 @@
     "ServerLevelSleepMixin",
     "ServerPlayerMovementMixin",
     "PlayerAttackExhaustionMixin",
-    "FoodDataExhaustionAccess"
+    "FoodDataExhaustionAccess",
+    "PlayerDataMixin"
   ],
   "injectors": {
     "defaultRequire": 1

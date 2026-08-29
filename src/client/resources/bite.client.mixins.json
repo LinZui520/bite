@@ -3,7 +3,8 @@
   "package": "com.eamon.bite.client.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
-    "ItemStackBarMixin"
+    "ItemStackBarMixin",
+    "LocalPlayerSprintMixin"
   ],
   "injectors": {
     "defaultRequire": 1

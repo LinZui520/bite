@@ -5,6 +5,8 @@ import com.eamon.bite.component.BiteComponents;
 import com.eamon.bite.component.ShelfLife;
 import com.eamon.bite.config.ServerConfig;
 import com.eamon.bite.hunger.HungerMetabolism;
+import com.eamon.bite.thirst.ThirstController;
+import com.eamon.bite.thirst.ThirstSyncPacket;
 import com.eamon.bite.freshness.FreshnessClock;
 import com.eamon.bite.freshness.FreshnessMath;
 import com.eamon.bite.freshness.FreshnessScanner;
@@ -38,6 +40,7 @@ public class BiteMod implements ModInitializer {
         ServerConfig.load(FabricLoader.getInstance().getConfigDir());
         BiteComponents.init();
         BiteItems.init();
+        ThirstSyncPacket.register();
         registerDefaultShelfLife();
         registerLootDropStamping();
         registerLazyScan();
@@ -52,6 +55,7 @@ public class BiteMod implements ModInitializer {
             SeasonClock.update(server.overworld());
             SeasonWeatherController.tick(server, server.overworld());
             HungerMetabolism.tick(server.getPlayerList().getPlayers());
+            ThirstController.tick(server.getPlayerList().getPlayers());
         });
         LOGGER.info("Because It's Too Easy initialized");
     }

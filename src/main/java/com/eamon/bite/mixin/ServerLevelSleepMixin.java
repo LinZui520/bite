@@ -37,6 +37,7 @@ public abstract class ServerLevelSleepMixin {
         long skipped = self.getOverworldClockTime() - bite$clockBeforeSleep;
         if (skipped > 0) {
             HungerMetabolism.onSleptThroughTicks(self.players(), skipped);
+            com.eamon.bite.thirst.ThirstController.onSleptThroughTicks(self.players(), skipped);
         }
     }
 }
