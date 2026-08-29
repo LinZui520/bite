@@ -4,7 +4,8 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "ItemStackBarMixin",
-    "LocalPlayerSprintMixin"
+    "LocalPlayerSprintMixin",
+    "HudAirMixin"
   ],
   "injectors": {
     "defaultRequire": 1

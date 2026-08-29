@@ -10,7 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
@@ -27,8 +26,8 @@ import net.minecraft.world.entity.player.Player;
  *       紧迫感（相位用 gameTime 保证确定性）</li>
  * </ul>
  *
- * <p><b>与氧气条的让位</b>：氧气条可见时（水下/缺氧）水滴上移一行
- * 到 -59，平时 -49——原版「氧气条对坐骑心脏让位」同一语言。
+ * <p><b>固定第二行</b>：饥饿/心 = 第一行（-39）、水滴 = 第二行（-49）、
+ * 氧气 = 第三行（-59，由 HudAirMixin 把原版氧气基线无条件下移一行）。
  */
 @Environment(EnvType.CLIENT)
 public final class ThirstHud implements HudElement {
@@ -61,10 +60,9 @@ public final class ThirstHud implements HudElement {
         float thirst = ThirstClientStore.get();
         long gameTime = client.level == null ? 0 : client.level.getGameTime();
 
-        // 氧气条可见时（水下/缺氧，原版显示条件）上移一行让位
-        boolean airBarVisible = player.isEyeInFluid(FluidTags.WATER)
-            || player.getAirSupply() < player.getMaxAirSupply();
-        int baseY = gui.guiHeight() - (airBarVisible ? 59 : 49);
+        // 固定第二行（guiHeight-49）：饥饿/心第一行、水滴第二行、氧气第三行
+        // （氧气条由 HudAirMixin 无条件下移一行，不再需要让位逻辑）
+        int baseY = gui.guiHeight() - 49;
         int xRight = gui.guiWidth() / 2 + 91;
 
         // 临界闪烁：≤3 时 0.5s 周期的「熄灭」相（10 tick 半周期）
