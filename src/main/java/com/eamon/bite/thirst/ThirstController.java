@@ -1,7 +1,6 @@
 package com.eamon.bite.thirst;
 
-import com.eamon.bite.season.Season;
-import com.eamon.bite.season.SeasonClock;
+import com.eamon.bite.season.SeasonRates;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
@@ -36,7 +35,7 @@ public final class ThirstController {
     /** 每 server tick 调用。 */
     public static void tick(Iterable<ServerPlayer> players) {
         for (ServerPlayer player : players) {
-            if (player.isCreative() || player.isSpectator()) continue;
+            if (!com.eamon.bite.ServerPlayers.participatesInSurvival(player)) continue;
             tickPlayer(player);
             ServerPlayNetworking.send(player, new ThirstSyncPacket(ThirstData.get(player)));
         }
@@ -51,7 +50,7 @@ public final class ThirstController {
             return;
         }
 
-        float drain = ThirstData.BASE_DRAIN_PER_TICK * seasonMultiplier(player);
+        float drain = ThirstData.BASE_DRAIN_PER_TICK * SeasonRates.thirst(player);
         if (player.isSprinting()) {
             drain += ThirstData.SPRINT_DRAIN_PER_TICK;
             // 干渴 ≤6：服务端权威强制停疾跑（客户端预测拦截之外的兜底）
@@ -77,20 +76,13 @@ public final class ThirstController {
         }
     }
 
-    /** 季节流失系数：夏 ×1.25（出汗），其余 1（用户口径 2026-08-30）。 */
-    public static float seasonMultiplier(Player player) {
-        return switch (SeasonClock.season(player.level())) {
-            case SUMMER -> 1.25f;
-            default -> 1.0f;
-        };
-    }
 
     /** 睡觉补结算（时钟跳变时由 SleepMixin 调用，skippedTicks 为跳过量）。 */
     public static void onSleptThroughTicks(Iterable<ServerPlayer> players, long skippedTicks) {
         float drain = ThirstData.BASE_DRAIN_PER_TICK * skippedTicks * ThirstData.SLEEP_DRAIN_FACTOR;
         if (drain <= 0.0f) return;
         for (ServerPlayer player : players) {
-            if (player.isCreative() || player.isSpectator()) continue;
+            if (!com.eamon.bite.ServerPlayers.participatesInSurvival(player)) continue;
             ThirstData.add(player, -drain);
         }
     }

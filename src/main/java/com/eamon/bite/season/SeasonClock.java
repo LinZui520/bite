@@ -1,5 +1,6 @@
 package com.eamon.bite.season;
 
+import com.eamon.bite.GameTime;
 import net.minecraft.world.level.Level;
 
 /**
@@ -40,7 +41,7 @@ public final class SeasonClock {
 
     /** 当日内进度 [0,1)：totalTicks 对 24000 取余。 */
     static float dayProgress(Level level) {
-        return (level.getOverworldClockTime() % 24000L) / 24000f;
+        return (level.getOverworldClockTime() % GameTime.TICKS_PER_DAY) / (float) GameTime.TICKS_PER_DAY;
     }
 
     /** 从世界时钟 totalTicks 推导当前季节（任意维度 → overworld WorldClock）。 */
@@ -55,7 +56,7 @@ public final class SeasonClock {
 
     /** 世界自然日序号（0 起）：totalTicks / 24000。 */
     public static long dayOfWorld(Level level) {
-        return Math.floorDiv(level.getOverworldClockTime(), 24000L);
+        return Math.floorDiv(level.getOverworldClockTime(), GameTime.TICKS_PER_DAY);
     }
 
     /** 日序号 → 季节（0 起：秋一当天 → AUTUMN）。 */

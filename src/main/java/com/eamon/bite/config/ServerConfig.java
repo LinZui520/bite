@@ -81,9 +81,9 @@ public record ServerConfig(
             0.5, 0.2, 0.75, 0.5, 0.3, 160, true,
             true, "bite:rotten_organic",
             // 饿腹代谢半档：2 游戏日 20→0（满档 FULL_DAY_RATE = 1 日）；
-            // 睡觉代谢 40%；动作疲劳 ×1.3（疾跑 0.1→0.13/米）；
+            // 睡觉代谢 50%（与口渴的睡眠系数统一）；动作疲劳 ×1.3；
             // 季节腐坏（DST perishable.lua 口径）：冬 ×0.75 / 夏 ×1.25
-            0.00208, 0.4, 1.3, 0.75, 1.25);
+            0.00208, 0.5, 1.3, 0.75, 1.25);
     }
 
     public static ServerConfig fromJson(String json) {
@@ -167,7 +167,7 @@ public record ServerConfig(
         Boolean spoiled_conversion;
         String spoiled_result;
         // 饥饿代谢：每 tick 疲劳（0 = 关闭，站桩不掉）；睡觉期间代谢系数
-        // （0.4 = 睡觉消耗为清醒的 40%）；动作疲劳乘数（1 = 原版，>1 更快饿）
+        // （0.5 = 睡觉消耗为清醒的 50%，与口渴统一）；动作疲劳乘数（1 = 原版，>1 更快饿）
         Double hunger_metabolism_per_tick;
         Double hunger_sleep_metabolism_factor;
         Double hunger_action_multiplier;

@@ -15,7 +15,7 @@ import java.util.List;
  * 返回游戏刻（24000/天）；-1 = 永不腐坏 / 非食物。
  */
 public final class ShelfLifeRegistry {
-    public static final long DAY = 24000L;
+    public static final long DAY = com.eamon.bite.GameTime.TICKS_PER_DAY;
 
     /** 分类判定顺序（先命中先用）。 */
     private static final List<String> CATEGORIES = List.of(

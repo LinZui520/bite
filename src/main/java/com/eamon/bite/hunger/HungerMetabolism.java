@@ -1,7 +1,7 @@
 package com.eamon.bite.hunger;
 
 import com.eamon.bite.config.ServerConfig;
-import com.eamon.bite.season.SeasonClock;
+import com.eamon.bite.season.SeasonRates;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.food.FoodData;
 
@@ -17,7 +17,7 @@ import net.minecraft.world.food.FoodData;
  *       （FoodData.tick 的 PEACEFUL 守卫）、饱和度先烧、睡觉跳过的时间
  *       不在此结算（见 {@link #onSleptThroughTicks}）</li>
  *   <li><b>睡觉补结算</b>：睡觉使时钟瞬移到次日 0 刻（被跳过的 tick 不
- *       会自然发生），在此按 <b>40%</b> 代谢率补算——早睡多跳多掉、
+ *       会自然发生），在此按 <b>50%</b> 代谢率补算——早睡多跳多掉、
  *       23 点睡只掉 ~0.1 格，睡醒饿但不惩罚睡觉</li>
  *   <li><b>动作消耗</b>（mixin 放大原版常量）：走路 0→0.005/米、
  *       疾跑 0.1→0.13/米、攻击 0.1→0.12。挖矿/跳跃不动（已有合理代价）。
@@ -36,21 +36,14 @@ public final class HungerMetabolism {
         if (rate <= 0.0f) return;
         for (ServerPlayer player : players) {
             // 创造/旁观不消耗（对齐原版：它们不参与饥饿系统）
-            if (player.isCreative() || player.isSpectator()) continue;
-            player.causeFoodExhaustion(rate * seasonMultiplier(player));
+            if (!com.eamon.bite.ServerPlayers.participatesInSurvival(player)) continue;
+            player.causeFoodExhaustion(rate * SeasonRates.hunger(player));
         }
     }
 
-    /** 季节代谢系数：冬 ×1.25（御寒耗能），其余 1。 */
-    public static float seasonMultiplier(ServerPlayer player) {
-        return switch (SeasonClock.season(player.level())) {
-            case WINTER -> 1.25f;
-            default -> 1.0f;
-        };
-    }
 
     /**
-     * 睡觉补结算：时钟跳变瞬间，按睡眠代谢率（清醒的 40%）对睡过这段
+     * 睡觉补结算：时钟跳变瞬间，按睡眠代谢率（清醒的 50%）对睡过这段
      * 时间的玩家补算疲劳。
      *
      * @param skippedTicks 时钟跳过的 tick 数（睡前时刻 → 次日 0 刻）
@@ -61,7 +54,7 @@ public final class HungerMetabolism {
         float exhaustion = rate * skippedTicks * (float) ServerConfig.get().hungerSleepMetabolismFactor();
         if (exhaustion <= 0.0f) return;
         for (ServerPlayer player : players) {
-            if (player.isCreative() || player.isSpectator()) continue;
+            if (!com.eamon.bite.ServerPlayers.participatesInSurvival(player)) continue;
             player.causeFoodExhaustion(exhaustion);
         }
     }
@@ -73,5 +66,5 @@ public final class HungerMetabolism {
 
     // 供测试与调参参考：满档代谢（1 游戏日 20→0）
     // 25 次结算 × 4 疲劳 / 24000 tick = 0.004167
-    public static final float FULL_DAY_RATE = 25 * 4 / 24000f;
+    public static final float FULL_DAY_RATE = 25 * 4 / (float) com.eamon.bite.GameTime.TICKS_PER_DAY;
 }

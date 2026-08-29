@@ -25,7 +25,7 @@ import net.minecraft.world.entity.player.Player;
 public final class ThirstData {
     public static final int MAX_THIRST = 20;
     /** 不动 3 游戏日清零的基础流失（每 tick）。 */
-    public static final float BASE_DRAIN_PER_TICK = MAX_THIRST / (3f * 24000f);
+    public static final float BASE_DRAIN_PER_TICK = MAX_THIRST / (3f * com.eamon.bite.GameTime.TICKS_PER_DAY);
     /** 疾跑额外流失（每 tick）。 */
     public static final float SPRINT_DRAIN_PER_TICK = 0.02f / 20f;
     /** 睡觉期间流失系数（清醒的 50%）。 */

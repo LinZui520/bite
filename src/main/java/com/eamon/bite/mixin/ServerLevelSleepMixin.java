@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  *
  * <p>时钟跳变使被跳过的 tick 不会自然发生——饿腹代谢（按 tick 结算）
  * 会漏掉整晚。本 mixin 在跳变前记录时钟、wakeUpAllPlayers 后结算差值，
- * 按睡眠代谢率（清醒的 40%）对参与睡觉的玩家补算疲劳。
+ * 按睡眠代谢率（清醒的 50%）对参与睡觉的玩家补算疲劳。
  *
  * <p>26.2 签名（genSources 验证）：睡眠分支位于 tick 内，先
  * {@code clockManager().moveToTimeMarker(..., WAKE_UP_FROM_SLEEP)} 后

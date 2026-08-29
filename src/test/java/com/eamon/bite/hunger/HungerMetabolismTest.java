@@ -31,10 +31,11 @@ class HungerMetabolismTest {
 
     @Test
     void sleepCostsLessThanStayingAwake() {
-        // 睡觉代谢 40%：睡过同一时长消耗不足清醒的四成五
-        double factor = ServerConfig.DEFAULT.hungerSleepMetabolismFactor();
-        assertTrue(factor > 0 && factor < 0.5,
-            "睡眠系数应为 (0, 0.5)，实际 " + factor);
+        // 睡觉代谢 50%（与口渴的 SLEEP_DRAIN_FACTOR 统一）：
+        // 睡过同一时长消耗恰为清醒的一半
+        assertEquals(0.5, ServerConfig.DEFAULT.hungerSleepMetabolismFactor(), 1e-9);
+        assertEquals(0.5, com.eamon.bite.thirst.ThirstData.SLEEP_DRAIN_FACTOR, 1e-9,
+            "两个系统的睡眠系数应统一");
     }
 
     @Test

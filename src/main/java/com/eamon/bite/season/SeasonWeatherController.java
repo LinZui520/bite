@@ -1,5 +1,6 @@
 package com.eamon.bite.season;
 
+import com.eamon.bite.GameTime;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -34,11 +35,11 @@ import net.minecraft.world.level.saveddata.WeatherData;
  */
 public final class SeasonWeatherController {
     /** 冬季降雪间隔（tick）：4~6 天（饥荒 15 天 3~4 场的比例缩放）。 */
-    static final UniformInt WINTER_SNOW_DELAY = UniformInt.of(96000, 144000);
+    static final UniformInt WINTER_SNOW_DELAY = UniformInt.of((int) GameTime.daysToTicks(4), (int) GameTime.daysToTicks(6));
     /** 春季阵雨间隔（tick）：1~2 天（饥荒春全季最密）。 */
-    static final UniformInt SPRING_RAIN_DELAY = UniformInt.of(24000, 48000);
+    static final UniformInt SPRING_RAIN_DELAY = UniformInt.of((int) GameTime.TICKS_PER_DAY, (int) GameTime.daysToTicks(2));
     /** 冬一保底雪时长（tick）：1 天（饥荒 early-winter ground cover）。 */
-    private static final int WINTER_OPENING_SNOW = 24000;
+    private static final int WINTER_OPENING_SNOW = (int) GameTime.TICKS_PER_DAY;
 
     private static boolean wasRaining;
     private static Season lastSeason;

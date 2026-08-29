@@ -71,7 +71,7 @@ public final class BiteCommands {
         if (life == null || life.spoilTicks() <= 0) {
             source.sendSuccess(() -> Component.translatable("bite.cmd.freshness.never"), false);
         } else {
-            source.sendSuccess(() -> Component.translatable("bite.cmd.freshness.life", life.spoilTicks() / 24000.0), false);
+            source.sendSuccess(() -> Component.translatable("bite.cmd.freshness.life", com.eamon.bite.GameTime.ticksToDays(life.spoilTicks())), false);
             long now = FreshnessClock.now(source.getLevel());
             double fraction = stamp == null ? 1.0 : FreshnessMath.fraction(now, stamp, life);
             int pct = (int) Math.round(fraction * 100);
