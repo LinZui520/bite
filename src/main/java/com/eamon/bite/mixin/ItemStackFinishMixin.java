@@ -4,6 +4,7 @@ import com.eamon.bite.freshness.EatSnapshot;
 import com.eamon.bite.thirst.ThirstController;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,22 +15,26 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * 进食结算注入点：{@code ItemStack.finishUsingItem} 的 HEAD 捕获、RETURN
- * 结算——新鲜度惩罚（快照-重算模式，语义见
- * {@link com.eamon.bite.freshness.SpoiledFoodHandler}）与饥渴补水。
+ * 结算——新鲜度惩罚（快照-重算模式）与饥渴补水。
  *
- * <p>两条结算<b>相互独立</b>：补水不依赖新鲜度快照——水瓶/牛奶/汤等
- * 饮品没有 FRESHNESS 戳（snap 为 null 是常态），曾被 snap 判空提前
- * return 挡掉（真实 bug：吃任何东西都不回水）。补水只需 entity 是
- * Player；且只在服务端执行（客户端镜像字段无需修改，值由
- * ThirstSyncPacket 同步）。
+ * <p>两条结算<b>相互独立</b>：补水不依赖新鲜度快照——饮品没有 FRESHNESS
+ * 戳（snap 为 null 是常态）。补水只需 entity 是 Player 且在服务端。
+ *
+ * <p>补水的物品在 <b>HEAD 时记录</b>：吃 stackSize=1 的东西（水瓶/牛奶/
+ * 汤）后 {@code consume(1)} 使 count 归零，RETURN 时 {@code getItem()}
+ * 会返回 AIR（isEmpty 时 typeHolder 切到 AIR）——在 RETURN 取物品会
+ * 全部漏掉 1 堆叠的补水主力（真实 bug，实测吃西瓜能回水而水瓶不能）。
  */
 @Mixin(ItemStack.class)
 public abstract class ItemStackFinishMixin {
     @Unique private EatSnapshot bite$snap;
+    @Unique private Item bite$item;
 
     @Inject(method = "finishUsingItem", at = @At("HEAD"))
     private void bite$capture(Level level, LivingEntity entity, CallbackInfoReturnable<ItemStack> cir) {
-        bite$snap = EatSnapshot.capture((ItemStack) (Object) this, entity);
+        ItemStack self = (ItemStack) (Object) this;
+        bite$snap = EatSnapshot.capture(self, entity);
+        bite$item = self.getItem();
     }
 
     @Inject(method = "finishUsingItem", at = @At("RETURN"))
@@ -39,11 +44,10 @@ public abstract class ItemStackFinishMixin {
             bite$snap.applyPenalty((Player) entity);
             bite$snap = null;
         }
-        // 饮食补水：与新鲜度无关，任何饮食都结算（仅服务端——客户端
-        // 不跑 completeUsingItem，此处双保险判 isClientSide）
+        // 饮食补水：与新鲜度无关（HEAD 已记录物品，规避空栈 AIR 问题）
         if (!level.isClientSide() && entity instanceof Player player) {
-            ItemStack self = (ItemStack) (Object) this;
-            ThirstController.onConsume(player, self.getItem());
+            ThirstController.onConsume(player, bite$item);
         }
+        bite$item = null;
     }
 }
