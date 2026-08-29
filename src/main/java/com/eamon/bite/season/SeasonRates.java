@@ -22,13 +22,15 @@ public final class SeasonRates {
     /** 夏季口渴流失系数（出汗，用户口径 2026-08-30：×2——夏天 1.5 天清零）。 */
     public static final float SUMMER_THIRST = 2.0f;
 
-    /** 饥饿代谢的季节系数。 */
+    /** 饥饿代谢的季节系数（仅玩家在主世界时生效——下界/末地不吃季节）。 */
     public static float hunger(Player player) {
+        if (player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return 1.0f;
         return SeasonClock.season(player.level()) == Season.WINTER ? WINTER_HUNGER : 1.0f;
     }
 
-    /** 口渴流失的季节系数。 */
+    /** 口渴流失的季节系数（仅玩家在主世界时生效）。 */
     public static float thirst(Player player) {
+        if (player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return 1.0f;
         return SeasonClock.season(player.level()) == Season.SUMMER ? SUMMER_THIRST : 1.0f;
     }
 }

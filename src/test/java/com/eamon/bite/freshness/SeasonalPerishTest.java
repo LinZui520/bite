@@ -3,6 +3,8 @@ package com.eamon.bite.freshness;
 import com.eamon.bite.component.FreshnessStamp;
 import com.eamon.bite.component.ShelfLife;
 import com.eamon.bite.season.Season;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,6 +17,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SeasonalPerishTest {
 
     private static final long LIFE = 24000L; // 1 天保质期
+
+    @BeforeEach
+    void overworldScope() {
+        // 季节系数只在主世界生效（SeasonScope 守卫）——测试显式标记
+        com.eamon.bite.season.SeasonScope.setOverworldFlag(true);
+    }
+
+    @AfterEach
+    void clearScope() {
+        com.eamon.bite.season.SeasonScope.clear();
+    }
 
     @Test
     void multiplierTable() {

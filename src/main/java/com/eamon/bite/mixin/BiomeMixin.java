@@ -32,6 +32,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class BiomeMixin {
     @Inject(method = "getBaseTemperature", at = @At("RETURN"), cancellable = true)
     private void bite$seasonalTemperature(CallbackInfoReturnable<Float> cir) {
+        // 季节只作用于主世界（用户口径 2026-08-30）——下界/末地温度不受季节偏移。
+        // Biome 实例跨维度共享且无 Level 上下文，经 SeasonScope 的维度标记判定
+        if (!com.eamon.bite.season.SeasonScope.isOverworld()) return;
         cir.setReturnValue(cir.getReturnValueF() + SeasonClock.currentOffset());
     }
 }

@@ -23,7 +23,8 @@
     "FoodDataExhaustionAccess",
     "PlayerDataMixin",
     "CampfireBlockEntityMixin",
-    "CrafterBlockMixin"
+    "CrafterBlockMixin",
+    "ServerLevelTickMixin"
   ],
   "injectors": {
     "defaultRequire": 1

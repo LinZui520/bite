@@ -41,7 +41,7 @@ public final class ThirstController {
         }
     }
 
-    private static void tickPlayer(ServerPlayer player) {
+    public static void tickPlayer(ServerPlayer player) {
         if (player.level().getDifficulty() == Difficulty.PEACEFUL) {
             // 和平：缓慢回满（对齐原版和平回饥饿的精神）
             if (ThirstData.get(player) < ThirstData.MAX_THIRST) {
@@ -65,9 +65,14 @@ public final class ThirstController {
             ThirstData.setThirstTimer(player, ThirstData.thirstTimer(player) + 1);
             if (ThirstData.thirstTimer(player) >= ThirstData.DAMAGE_INTERVAL_TICKS) {
                 Difficulty difficulty = player.level().getDifficulty();
-                if (player.getHealth() > 10.0F || difficulty == Difficulty.HARD
-                    || player.getHealth() > 1.0F && difficulty == Difficulty.NORMAL) {
-                    player.hurtServer(player.level(), player.damageSources().drown(), 1.0F);
+                boolean gate = player.getHealth() > 10.0F || difficulty == Difficulty.HARD
+                    || player.getHealth() > 1.0F && difficulty == Difficulty.NORMAL;
+                com.eamon.bite.BiteMod.LOGGER.info(
+                    "[bite-thirst] dmg tick: player={} thirst={} health={} difficulty={} gate={}",
+                    player.getName().getString(), ThirstData.get(player), player.getHealth(), difficulty, gate);
+                if (gate) {
+                    boolean hurt = player.hurtServer(player.level(), player.damageSources().drown(), 1.0F);
+                    com.eamon.bite.BiteMod.LOGGER.info("[bite-thirst] hurtServer returned {}", hurt);
                 }
                 ThirstData.setThirstTimer(player, 0);
             }

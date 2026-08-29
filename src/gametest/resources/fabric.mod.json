@@ -5,7 +5,10 @@
   "name": "Bite GameTest",
   "environment": "*",
   "entrypoints": {
-    "fabric-gametest": ["com.eamon.bite.test.FreshnessGameTests"]
+    "fabric-gametest": [
+      "com.eamon.bite.test.FreshnessGameTests",
+      "com.eamon.bite.test.ThirstGameTests"
+    ]
   },
   "depends": {
     "fabricloader": ">=0.19.3",

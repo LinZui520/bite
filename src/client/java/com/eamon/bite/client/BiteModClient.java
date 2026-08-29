@@ -22,6 +22,8 @@ public class BiteModClient implements ClientModInitializer {
         ClientConfig.load(FabricLoader.getInstance().getConfigDir());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.level != null) {
+                // 客户端维度标记（进度条渲染读 FreshnessMath 的季节系数用）
+                com.eamon.bite.season.SeasonScope.setCurrentDimension(client.level.dimension());
                 FreshnessClock.update(FreshnessClock.now(client.level));
                 Season season = SeasonClock.season(client.level);
                 // 换季时清 render 线程的群系温度缓存（server 线程由 SeasonWeatherController 清）

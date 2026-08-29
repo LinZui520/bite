@@ -28,6 +28,10 @@ public final class FreshnessMath {
 
     /** 季节腐坏系数：冬 0.75（慢）/ 夏 1.25（快）/ 春秋 1（配置可改，1 = 关）。 */
     public static double perishMultiplier(Season season) {
+        // 季节只作用于主世界（用户口径 2026-08-30）：下界/末地的物品
+        // 不吃季节腐坏系数。经 SeasonScope 判定（tick 内的 BiomeMixin/
+        // 扫描路径都有标记；无标记的调用点保守 1.0 = 无季节影响）
+        if (!com.eamon.bite.season.SeasonScope.isOverworld()) return 1.0;
         ServerConfig cfg = ServerConfig.get();
         return switch (season) {
             case WINTER -> cfg.perishWinterMultiplier();
