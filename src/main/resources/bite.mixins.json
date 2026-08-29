@@ -22,7 +22,8 @@
     "PlayerAttackExhaustionMixin",
     "FoodDataExhaustionAccess",
     "PlayerDataMixin",
-    "CampfireBlockEntityMixin"
+    "CampfireBlockEntityMixin",
+    "CrafterBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1
