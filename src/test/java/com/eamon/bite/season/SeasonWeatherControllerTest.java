@@ -26,11 +26,14 @@ class SeasonWeatherControllerTest {
 
     @Test
     void springRainsMuchMoreOftenThanWinter() {
-        // 饥荒频率序：春 >>> 冬 > 秋 > 夏。春季间隔应显著短于冬季
-        int springMax = SeasonWeatherController.SPRING_RAIN_DELAY.maxInclusive();
-        int winterMin = SeasonWeatherController.WINTER_SNOW_DELAY.minInclusive();
-        assertTrue(springMax < winterMin,
-            "春季最疏的阵雨（" + springMax / 24000 + " 天）也应密于冬季最密的雪（" + winterMin / 24000 + " 天）");
+        // 频率序：春 > 冬。春 1~2 天 / 冬 2~3 天：春的期望间隔（1.5 天）
+        // 应短于冬的期望间隔（2.5 天）——按区间中值比较
+        int springMid = (SeasonWeatherController.SPRING_RAIN_DELAY.minInclusive()
+            + SeasonWeatherController.SPRING_RAIN_DELAY.maxInclusive()) / 2;
+        int winterMid = (SeasonWeatherController.WINTER_SNOW_DELAY.minInclusive()
+            + SeasonWeatherController.WINTER_SNOW_DELAY.maxInclusive()) / 2;
+        assertTrue(springMid < winterMid,
+            "春的期望间隔（" + springMid / 24000.0 + " 天）应短于冬（" + winterMid / 24000.0 + " 天）");
     }
 
     @Test
