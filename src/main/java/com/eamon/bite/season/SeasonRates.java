@@ -13,7 +13,8 @@ import net.minecraft.world.entity.player.Player;
  *   <li>口渴流失：夏 ×2（出汗，仅主世界）；<b>下界 ×2</b>（灼热环境
  *       蒸腾，用户口径 2026-08-30——地狱 1.5 天清零，与盛夏同烈）</li>
  *   <li>食物腐坏：见 {@link com.eamon.bite.freshness.FreshnessMath#perishMultiplier}
- *       （冬 0.75 / 夏 1.25，配置驱动——属配置域不在此列）</li>
+ *       （冬 0.75 / 夏 1.25，配置驱动）；<b>下界 ×1.25</b>（灼热环境，
+ *       与盛夏同烈）</li>
  * </ul>
  */
 public final class SeasonRates {
@@ -25,6 +26,8 @@ public final class SeasonRates {
     public static final float SUMMER_THIRST = 2.0f;
     /** 下界口渴流失系数（灼热蒸腾，用户口径 2026-08-30：×2——1.5 天清零，与盛夏同烈）。 */
     public static final float NETHER_THIRST = 2.0f;
+    /** 下界食物腐坏系数（灼热环境，用户口径 2026-08-30：×1.25——与盛夏同烈）。 */
+    public static final double NETHER_PERISH = 1.25;
 
     /** 饥饿代谢的季节系数（仅玩家在主世界时生效——下界/末地不吃季节）。 */
     public static float hunger(Player player) {

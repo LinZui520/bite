@@ -26,12 +26,21 @@ public final class FreshnessMath {
         return Math.clamp(f, 0.0, 1.0);
     }
 
-    /** 季节腐坏系数：冬 0.75（慢）/ 夏 1.25（快）/ 春秋 1（配置可改，1 = 关）。 */
+    /**
+     * 季节/维度腐坏系数：冬 ×0.75（慢）/ 夏 ×1.25（快）/ 春秋 ×1
+     * （配置可改，1 = 关）；<b>下界恒 ×1.25</b>（灼热环境——与盛夏
+     * 同烈，用户口径 2026-08-30）。
+     *
+     * <p>维度判定经 {@link SeasonScope}：下界/末地的物品不吃季节系数
+     * （季节仅主世界）；下界叠加自己的环境系数。无标记的调用点
+     * （纯 JVM 等）保守 1.0。
+     */
     public static double perishMultiplier(Season season) {
-        // 季节只作用于主世界（用户口径 2026-08-30）：下界/末地的物品
-        // 不吃季节腐坏系数。经 SeasonScope 判定（tick 内的 BiomeMixin/
-        // 扫描路径都有标记；无标记的调用点保守 1.0 = 无季节影响）
-        if (!com.eamon.bite.season.SeasonScope.isOverworld()) return 1.0;
+        com.eamon.bite.season.SeasonScope.Scope scope = com.eamon.bite.season.SeasonScope.current();
+        if (scope == com.eamon.bite.season.SeasonScope.Scope.NETHER) {
+            return com.eamon.bite.season.SeasonRates.NETHER_PERISH;
+        }
+        if (scope != com.eamon.bite.season.SeasonScope.Scope.OVERWORLD) return 1.0;
         ServerConfig cfg = ServerConfig.get();
         return switch (season) {
             case WINTER -> cfg.perishWinterMultiplier();

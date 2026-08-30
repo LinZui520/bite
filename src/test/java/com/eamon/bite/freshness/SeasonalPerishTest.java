@@ -21,7 +21,7 @@ class SeasonalPerishTest {
     @BeforeEach
     void overworldScope() {
         // 季节系数只在主世界生效（SeasonScope 守卫）——测试显式标记
-        com.eamon.bite.season.SeasonScope.setOverworldFlag(true);
+        com.eamon.bite.season.SeasonScope.setScopeForTest(com.eamon.bite.season.SeasonScope.Scope.OVERWORLD);
     }
 
     @AfterEach
@@ -35,6 +35,26 @@ class SeasonalPerishTest {
         assertEquals(1.25, FreshnessMath.perishMultiplier(Season.SUMMER));
         assertEquals(1.0, FreshnessMath.perishMultiplier(Season.SPRING));
         assertEquals(1.0, FreshnessMath.perishMultiplier(Season.AUTUMN));
+    }
+
+    @Test
+    void netherPerishesAtSummerRate() {
+        // 下界恒 ×1.25（灼热环境），与季节无关
+        com.eamon.bite.season.SeasonScope.setScopeForTest(com.eamon.bite.season.SeasonScope.Scope.NETHER);
+        for (Season s : Season.values()) {
+            assertEquals(1.25, FreshnessMath.perishMultiplier(s),
+                s + " 下界腐坏系数应恒 1.25");
+        }
+    }
+
+    @Test
+    void otherDimensionsHaveNoModifiers() {
+        // 末地等：全基准 1.0
+        com.eamon.bite.season.SeasonScope.setScopeForTest(com.eamon.bite.season.SeasonScope.Scope.OTHER);
+        for (Season s : Season.values()) {
+            assertEquals(1.0, FreshnessMath.perishMultiplier(s),
+                s + " 末地腐坏系数应恒 1.0");
+        }
     }
 
     @Test
