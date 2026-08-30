@@ -10,8 +10,8 @@ import net.minecraft.world.entity.player.Player;
  * seasonMultiplier switch——收敛于此，语义单一来源：
  * <ul>
  *   <li>饥饿代谢：冬 ×1.25（御寒耗能，仅主世界）</li>
- *   <li>口渴流失：夏 ×2（出汗，仅主世界）；<b>下界 ×1.5</b>（灼热环境
- *       蒸腾，用户口径 2026-08-30——地狱 2 天清零）</li>
+ *   <li>口渴流失：夏 ×2（出汗，仅主世界）；<b>下界 ×2</b>（灼热环境
+ *       蒸腾，用户口径 2026-08-30——地狱 1.5 天清零，与盛夏同烈）</li>
  *   <li>食物腐坏：见 {@link com.eamon.bite.freshness.FreshnessMath#perishMultiplier}
  *       （冬 0.75 / 夏 1.25，配置驱动——属配置域不在此列）</li>
  * </ul>
@@ -23,8 +23,8 @@ public final class SeasonRates {
     public static final float WINTER_HUNGER = 1.25f;
     /** 夏季口渴流失系数（出汗，用户口径 2026-08-30：×2——夏天 1.5 天清零）。 */
     public static final float SUMMER_THIRST = 2.0f;
-    /** 下界口渴流失系数（灼热蒸腾，用户口径 2026-08-30：×1.5——2 天清零）。 */
-    public static final float NETHER_THIRST = 1.5f;
+    /** 下界口渴流失系数（灼热蒸腾，用户口径 2026-08-30：×2——1.5 天清零，与盛夏同烈）。 */
+    public static final float NETHER_THIRST = 2.0f;
 
     /** 饥饿代谢的季节系数（仅玩家在主世界时生效——下界/末地不吃季节）。 */
     public static float hunger(Player player) {
