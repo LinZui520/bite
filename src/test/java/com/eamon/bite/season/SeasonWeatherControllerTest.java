@@ -2,6 +2,7 @@ package com.eamon.bite.season;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -13,12 +14,14 @@ class SeasonWeatherControllerTest {
 
     @Test
     void winterSnowIsIntermittentNotContinuous() {
-        // 饥荒冬季：15 天 3~4 场、间隔 ~8.6 天 → 9 天季按比例 ≈ 5 天间隔。
-        // 间隔必须显著大于 0（间歇）且小于季长（季内至少再下一场）
+        // 用户口径 2026-08-30：冬季雪间隔 2~3 天（9 天季约 3 场）。
+        // 间隔必须 ≥1 天（间歇）且 < 季长（季内能再来一场）
         int min = SeasonWeatherController.WINTER_SNOW_DELAY.minInclusive();
         int max = SeasonWeatherController.WINTER_SNOW_DELAY.maxInclusive();
-        assertTrue(min >= 3 * 24000, "冬季间隔下界应 ≥3 天（间歇性，实际 " + min / 24000 + " 天）");
+        assertTrue(min >= 24000, "冬季间隔下界应 ≥1 天（间歇性，实际 " + min / 24000 + " 天）");
         assertTrue(max < 9 * 24000, "冬季间隔上界应 <9 天（季内再来一场，实际 " + max / 24000 + " 天）");
+        assertEquals(2 * 24000, min, "下界应为 2 天");
+        assertEquals(3 * 24000, max, "上界应为 3 天");
     }
 
     @Test

@@ -21,7 +21,7 @@ import net.minecraft.world.level.saveddata.WeatherData;
  * <ul>
  *   <li><b>冬</b>：间歇性降雪——冬一起保底降水 2 天（温度过渡使冬一
  *       温带先雨后雪、冬二全雪，用户口径 2026-08-30「雨持续到冬二」），
- *       之后每 4~6 天一场。温度已由
+ *       之后每 2~3 天一场。温度已由
  *       {@link SeasonTemperature} 压到 0.15 以下 → 温带雨即雪、水结冰；
  *       地面雪层整个冬天不化（随机刻融化要求季节温度 ≥0.15）——视觉上
  *       整个冬天积雪不退，只有约 1/3 时间天上在下雪，与饥荒一致</li>
@@ -35,8 +35,8 @@ import net.minecraft.world.level.saveddata.WeatherData;
  * 写同一状态、后写者胜——下次降水停止或换季时重新接管。
  */
 public final class SeasonWeatherController {
-    /** 冬季降雪间隔（tick）：4~6 天（饥荒 15 天 3~4 场的比例缩放）。 */
-    static final UniformInt WINTER_SNOW_DELAY = UniformInt.of((int) GameTime.daysToTicks(4), (int) GameTime.daysToTicks(6));
+    /** 冬季降雪间隔（tick）：2~3 天（用户口径 2026-08-30——9 天季约 3 场雪）。 */
+    static final UniformInt WINTER_SNOW_DELAY = UniformInt.of((int) GameTime.daysToTicks(2), (int) GameTime.daysToTicks(3));
     /** 春季阵雨间隔（tick）：1~2 天（饥荒春全季最密）。 */
     static final UniformInt SPRING_RAIN_DELAY = UniformInt.of((int) GameTime.TICKS_PER_DAY, (int) GameTime.daysToTicks(2));
     /**
