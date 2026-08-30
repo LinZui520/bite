@@ -32,7 +32,7 @@ public final class SeasonRates {
         return SeasonClock.season(player.level()) == Season.WINTER ? WINTER_HUNGER : 1.0f;
     }
 
-    /** 口渴流失的季节/维度系数（季节仅主世界；下界恒 ×1.5 灼热蒸腾）。 */
+    /** 口渴流失的季节/维度系数（季节仅主世界；下界恒 ×2 灼热蒸腾）。 */
     public static float thirst(Player player) {
         var dimension = player.level().dimension();
         if (dimension == net.minecraft.world.level.Level.NETHER) return NETHER_THIRST;
