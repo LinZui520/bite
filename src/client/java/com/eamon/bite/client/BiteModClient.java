@@ -37,6 +37,7 @@ public class BiteModClient implements ClientModInitializer {
         FadingHudText.register();
         SeasonHud.register();
         ThirstHud.register();
+        com.eamon.bite.client.biome.BiomeHud.register();
         ThirstClientStore.register();
     }
 }
