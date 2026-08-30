@@ -19,8 +19,9 @@ import net.minecraft.world.level.saveddata.WeatherData;
  *
  * <p>节奏（9 天一季 = 饥荒季长的比例缩放）：
  * <ul>
- *   <li><b>冬</b>：间歇性降雪——冬一保底一场雪（对齐饥荒 early-winter
- *       「先铺一层地面积雪」的保底设计），之后每 4~6 天一场。温度已由
+ *   <li><b>冬</b>：间歇性降雪——冬一起保底降水 2 天（温度过渡使冬一
+ *       温带先雨后雪、冬二全雪，用户口径 2026-08-30「雨持续到冬二」），
+ *       之后每 4~6 天一场。温度已由
  *       {@link SeasonTemperature} 压到 0.15 以下 → 温带雨即雪、水结冰；
  *       地面雪层整个冬天不化（随机刻融化要求季节温度 ≥0.15）——视觉上
  *       整个冬天积雪不退，只有约 1/3 时间天上在下雪，与饥荒一致</li>
@@ -38,8 +39,13 @@ public final class SeasonWeatherController {
     static final UniformInt WINTER_SNOW_DELAY = UniformInt.of((int) GameTime.daysToTicks(4), (int) GameTime.daysToTicks(6));
     /** 春季阵雨间隔（tick）：1~2 天（饥荒春全季最密）。 */
     static final UniformInt SPRING_RAIN_DELAY = UniformInt.of((int) GameTime.TICKS_PER_DAY, (int) GameTime.daysToTicks(2));
-    /** 冬一保底雪时长（tick）：1 天（饥荒 early-winter ground cover）。 */
-    private static final int WINTER_OPENING_SNOW = (int) GameTime.TICKS_PER_DAY;
+    /**
+     * 冬一保底降水时长（tick）：2 天（用户口径 2026-08-30——冬一开始下、
+     * 持续到冬二结束）。形态随温度过渡自然演变：冬一白天森林仍是雨
+     * （换季降温线性过渡，81% 进度才穿雨雪线），傍晚转雪、冬二全天雪——
+     * 「一场冷雨把冬天带来」的入冬叙事。
+     */
+    private static final int WINTER_OPENING_SNOW = (int) GameTime.daysToTicks(2);
 
     private static boolean wasRaining;
     private static Season lastSeason;
